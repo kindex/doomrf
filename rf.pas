@@ -20,6 +20,8 @@ const
   levels='Pavel Burakov [ICE] & kindeX';
   comment='Beta 2 *** Freeware **** Special for PROGMEISTARS !';
   levext='.lev';
+  bot1=1;
+  bot2=2;
   playdefitem=2;
   freeitem=1;
   oxysec=10;
@@ -53,7 +55,7 @@ const
   scry:integer=19*8;
   scrx:integer=260;
   maxt=1600 div 8;
-  maxedmenu=11;
+  maxedmenu=12;
   maxmust=128;
   defx=200; defy=200; defname='';
   maxmonframe=10;
@@ -92,7 +94,8 @@ const
   'Предметы',
   'Функции',
   'Скрытые',
-  'Пути'
+  'Пути',
+  '(C)'
   );
 type
   real=single;
@@ -103,7 +106,7 @@ type
   end;
   tkeys=array[1..maxkey]of boolean;
 const
-  origlev:tcapt='FL01'; lever00:tcapt='FLEV';
+  origlev:tcapt='FL02'; lever00:tcapt='FLEV';
   blood:tcolor=(m:180; r:12; del: 6{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
   blow:tcolor=(m:160; r:8; del:2);
@@ -111,12 +114,12 @@ const
   ckey:array[1..2,1..maxkey]of byte=(
   (1,$4b,$4d,$1d,57,28),
   (1,30,32,15,17,16));
-{ 1-Exit
-  2runleft
-  3-runright
-  4-atack
-  5-Jump
-  6-NextWeapon }
+  kexit=1;
+  kleft=2;
+  kright=3;
+  katack=4;
+  kjump=5;
+  knext=6;
 type
    tdest=(left,right);
 {   tnpat=0..maxpat;}
@@ -175,9 +178,11 @@ type
   tnode=object(tobj)
     c: byte;
     maxl: shortint;
+    wave,from: longint;
     l:array[0..maxlink]of
       record
         n: tmaxnode;
+        d: longint;
         c: byte;
       end;
     procedure init(ax,ay:real; ac:byte);
@@ -205,6 +210,7 @@ type
      health,armor,fired,buhalo,vempire,oxy,oxylife:real;
      weap: tmaxweapon;
      w:set of tmaxweapon;
+     key:set of 1..maxkey;
      bul:array[tmaxbul]of integer;
      procedure init(ax,ay,adx,ady:real; at:tmaxmontip; ad:tdest; aw:longint; aai,af:boolean; ah:longint);
      function takegod(n:longint):boolean;
@@ -280,6 +286,7 @@ type
   arrayofnode=array[0..maxnode]of tnode;
   tmap=object
     name:string[8];
+    copy,com:string;
     land:tland;
     x,y,dx,dy:longint;
     g:real;
@@ -293,6 +300,9 @@ type
     e:^arrayofbomb;
     n:^arrayofnode;
     procedure new;
+    function  getnode(mx,my:longint):integer;
+    procedure deltanode;
+    procedure clearnode;
     procedure create(ax,ay,adx,ady:longint; aname:string);
     procedure reloadpat;
     procedure deletepat;
@@ -353,6 +363,7 @@ type
   tplayer=object
     enable,win,lose,god:boolean;
     name:string[40];
+    bot,curn,lastn,goal,nextn:longint;
     startx,starty,deftip,n,frag,die,kill:integer;
     startdest:tdest;
     health,maxhealth,armor,oxy:real;
@@ -362,7 +373,7 @@ type
     hero: integer;
     key:tkeys;
     save:tmon;
-    procedure init(ax1,ay1,ax2,ay2,ax,ay,at:integer;ad:tdest; aname:string; an:integer);
+    procedure init(ax1,ay1,ax2,ay2,ax,ay,at:integer;ad:tdest; aname:string; an,ab:integer);
     procedure reinit(ax,ay,atip:integer;adest:tdest);
     procedure settip(at:integer);
     procedure initmulti;
@@ -580,6 +591,28 @@ begin
      exit;
    end;
 end;
+procedure tmap.deltanode;
+var
+  i,j,t:longint;
+begin
+  for i:=0 to maxnode do
+   if n^[i].enable then
+    for j:=0 to n^[i].maxl do
+    begin
+      t:=n^[i].l[j].n;
+      n^[i].l[j].d:=round(sqrt(sqr(n^[t].x-n^[i].x))+sqr(n^[t].y-n^[i].y));
+    end;
+end;
+procedure tmap.clearnode;
+var i:integer;
+begin
+  for i:=0 to maxnode do
+   if n^[i].enable then
+   begin
+     n^[i].wave:=maxint;
+     n^[i].from:=-1;
+   end;
+end;
 procedure tnode.addlink(an,ac:integer);
 var cur:integer;
 begin
@@ -639,13 +672,13 @@ begin
   false:
   begin
     maxpl:=1;
-    player[1].init(0,0,getmaxx,getmaxy,60,270,play1,right,'Player',1);
+    player[1].init(0,0,getmaxx,getmaxy,60,270,play1,right,'Player',1,bot1);
   end;
   true:
   begin
     maxpl:=2;
-    player[1].init(0,0,getmaxx,getmaxy div 2,60,270,play1,right,'Player',1);
-    player[2].init(0,getmaxy div 2+1,getmaxx,getmaxy,10,270,play2,right,'Player2',2)
+    player[1].init(0,0,getmaxx,getmaxy div 2,60,270,play1,right,'Player',1,bot1);
+    player[2].init(0,getmaxy div 2+1,getmaxx,getmaxy,10,270,play2,right,'Player2',2,bot2)
   end;
   end;
   player[1].settip(play1);
@@ -842,7 +875,7 @@ begin
 end;
 procedure tplayer.reinit;
 begin
-  init(x1,y1,x2,y2,ax,ay,atip,adest,name,n);
+  init(x1,y1,x2,y2,ax,ay,atip,adest,name,n,bot);
   hero:=map.initmon(ax,ay,deftip,adest,false{ai},false{first},n);
 {  map.m^[hero].takeitem(monster[tip].defitem);}
   win:=false;
@@ -932,10 +965,12 @@ procedure tplayer.settip(at:integer);
 begin
   deftip:=at;
 end;
-procedure tplayer.init(ax1,ay1,ax2,ay2,ax,ay,at:integer; ad:tdest; aname:string; an:integer);
+procedure tplayer.init(ax1,ay1,ax2,ay2,ax,ay,at:integer; ad:tdest; aname:string; an,ab:integer);
 begin
   enable:=true;
   n:=an;
+  bot:=ab;
+  curn:=0; lastn:=-1; nextn:=1;
   x1:=ax1;
   x2:=ax2;
   y1:=ay1;
@@ -999,8 +1034,75 @@ begin
   if weap>maxweapon then weap:=1;
   delay:=round(mfps/speed*0.25);
 end;
+function tmap.getnode(mx,my:longint):integer;
+var i,d,min,c:longint;
+begin
+  c:=-1;
+  min:=maxint;
+  for i:=0 to maxnode do
+   if n^[i].enable then
+   begin
+     d:=round(sqrt(sqr(mx-n^[i].mx)+sqr(my-n^[i].my)));
+     if d<min then begin c:=i; min:=d; end;
+   end;
+  getnode:=c;
+end;
 procedure tplayer.move;
-var i,mx,my:integer;
+var
+  i,mx,my:integer;
+function getgoal:integer;
+var i:integer;
+begin
+  getgoal:=-1;
+  with map do
+   for i:=0 to maxnode do
+    if n^[i].enable then
+     if n^[i].c and cgoal>0 then begin getgoal:=i; exit; end;
+end;
+procedure wave(s,t:integer);
+var i,j,k,c:integer;
+begin
+  if t=-1 then exit;
+  with map do
+  begin
+    n^[s].wave:=0;
+    n^[s].from:=-1;
+    for i:=0 to maxnode do
+      for j:=0 to maxnode do
+       if n^[j].enable then
+         for k:=0 to n^[j].maxl do
+          begin
+            c:=n^[j].l[k].n;
+            if n^[c].wave>n^[j].l[k].d+n^[j].wave then
+            begin
+               n^[c].from:=j;
+               n^[c].wave:=n^[j].l[k].d+n^[j].wave;
+            end;
+          end;
+  end;
+end;
+function getpath:integer;
+var l,c,i:integer;
+begin
+  c:=goal;
+  i:=0;
+  repeat
+    inc(i);
+    l:=c;
+    c:=map.n^[c].from;
+    if c=-1 then break;
+  until (c=curn)or(map.n^[c].wave=0)or(i>maxnode);
+  getpath:=l;
+end;
+procedure gotonode(a,b:integer);
+var c:integer;
+begin
+  if mx<map.n^[b].mx then include(map.m^[hero].key,kright) else include(map.m^[hero].key,kleft);
+  c:=-1;
+  for c:=0 to map.n^[a].maxl do
+    if map.n^[a].l[c].n=b then break;
+  if map.n^[a].l[c].c and cjump>0 then include(map.m^[hero].key,kjump);
+end;
 begin
   if (ammo=0)and(weapon[weap].hit=0) then map.m^[hero].takenext;
   mx:=round(map.m^[hero].x);
@@ -1030,16 +1132,43 @@ begin
       end;
 
    end;
+  map.m^[hero].key:=[];
   if key[1] then endgame:=true;
-  if key[2] then map.m^[hero].runleft;
-  if key[3] then map.m^[hero].runright;
-  if key[4] then map.m^[hero].atack;
-  if key[5] then
-  begin
-    map.m^[hero].jump;
+  case bot of
+  0:
+   begin
+     if key[2] then include(map.m^[hero].key,kleft);
+     if key[3] then include(map.m^[hero].key,kright);
+     if key[4] then include(map.m^[hero].key,katack);
+     if key[5] then if not map.m^[hero].life then lose:=true else include(map.m^[hero].key,kjump);
+     if key[6] then include(map.m^[hero].key,knext);
+   end;
+ 1:begin {SuperAI - bots}
+    map.m^[hero].key:=[];
     if not map.m^[hero].life then lose:=true;
+    mx:=map.m^[hero].mx;
+    my:=map.m^[hero].my;
+    if (abs(map.n^[nextn].mx-mx+abs(map.n^[nextn].my-my))<32)or(random(100)=0) then curn:=nextn;
+    if curn<>lastn then
+    begin
+{     curn:=nextn;}
+       map.clearnode;
+{    map.drawhidden;}
+      lastn:=curn;
+      curn:=map.getnode(mx,my);  if curn=-1 then exit;
+      goal:=getgoal;    if goal=-1 then exit;
+      wave(curn,goal);
+      nextn:=getpath;
+    end;
+
+    gotonode(curn,nextn);
+    digit(10,10,curn,' ');
+    digit(10,50,nextn,' ');
+    digit(10,100,map.n^[nextn].wave,'%');
+    digit(10,120,map.n^[nextn].from,'%');
+    screen;
   end;
-  if key[6] then map.m^[hero].takenext;
+ end;
 end;
 procedure titem.init(ax,ay,adx,ady:real; at:integer; af:boolean);
 begin
@@ -1201,6 +1330,7 @@ begin
     then
     begin
       map.m^[i].damage(mx,my,bul[tip].hit,0,bul[tip].fire/speed*mfps,who);
+      map.m^[i].dx:=map.m^[i].dx+dx*0.1;
       detonate;
       exit;
     end;
@@ -1345,6 +1475,11 @@ begin
   if not life then begin inc(delay,2);
     if delay>truptime*mfps/speed then begin done; exit; end; end;
   if ai then moveai;
+  if kleft in key then runleft;
+  if kright in key then runright;
+  if katack in key then atack;
+  if kjump in key then jump;
+  if knext in key then takenext;
   tobj.move;
   if deldam>0 then dec(deldam);
 
@@ -1385,9 +1520,12 @@ begin
      map.initbomb(mx,my,barrelbomb,lastwho);
      ai:=true;
    end;
- if speed>0 then
-  if (fired>0)and(time.hod mod round(0.1*mfps/speed)=0) then
-     map.initbomb(mx,my,bombfire,0);
+ if deldam=0 then
+  if (fired>0) then
+  begin
+    map.initbomb(mx,my,bombfire,0);
+    deldam:=round(0.1*mfps/speed);
+  end;
   if fired>0 then damage(mx,my,0,oxysec*speed/mfps,0,0);
   fired:=fired-1;
   if fired<0 then fired:=0;
@@ -1429,6 +1567,7 @@ procedure movesee;
 var tx,ty,l:integer;
     ry,d,ddy:real;
 begin
+  key:=[];
   see:=false;
   case dest of
    left:  l:=-1;
@@ -1479,19 +1618,19 @@ begin
   begin
     if sniper then
     begin
-     if (dest=left)and(target.x>self.x) then runright else
-     if (dest=right)and(target.x<self.x) then runleft;
+     if (dest=left)and(target.x>self.x) then include(key,kright) else
+     if (dest=right)and(target.x<self.x) then include(key,kleft);
     end;
     if not see then
      if (abs(target.x-self.x)>10) then
      begin
-      if target.x<self.x then runleft else runright
+      if target.x<self.x then include(key,kleft) else include(key,kright);
      end
      else
-    if random(1000)=0 then jump;
-    if (weap=1)or((fired>0)and(sniper)) then if target.x<self.x then runleft else runright
+    if random(1000)=0 then include(key,kjump);
+    if (weap=1)or((fired>0)and(sniper)) then if target.x<self.x then include(key,kleft) else include(key,kright);
   end;
-  if see then begin atack; know:=true; end;
+  if see then begin include(key,katack); know:=true; end;
 end;
 procedure tmon.runright;
 begin
@@ -1719,6 +1858,10 @@ begin
          begin
            map.done;
            map.create(defx,defx,0,0,defname);
+           map.clear;
+           wb.print(100,50,'Авторские права');
+           s:='Создал: ';
+           readline(1,100,map.copy,s,white,0);
          end;
        end;
     5: what:=face;
@@ -1728,6 +1871,11 @@ begin
     9: what:=func;
     10: begin cool:=not cool; repeat until not mouse.push; end;
     11: what:=node;
+    12:begin
+         wb.print(100,50,'КомментарииC');
+{         readline(1,100,map.copy,map.copy,white,0);}
+         readline(1,100,map.com,map.com,white,0);
+       end;
   end;
  end;
   if not push then
@@ -2059,7 +2207,7 @@ end;
 procedure tobj.move;
 var
   savex,savey:real;
-  x1,y1,x2,y2,i,j:integer;
+  x1,y1,x2,y2,i,j:longint;
 begin
   dy:=dy+map.g*speed;
   savex:=x;
@@ -2082,8 +2230,7 @@ begin
   end;
   standing:=getstand;
 
-  x1:=lx-getsx div 2; x2:=x1+getsx-1;
-  y2:=norm(0,map.y,ly);
+  x1:=lx-getsx div 2; x2:=x1+getsx-1;  y2:=norm(0,map.y,ly);
   for i:=max(0,x1) to min(map.x,x2) do
    if map.land[y2]^[i].land and cstand>0 then
    begin
@@ -2091,6 +2238,8 @@ begin
      y:=y-1;  my:=round(y); ly:=my div 8;
      break;
    end;
+
+  x1:=lx-getsx div 2; x2:=x1+getsx-1;  y2:=norm(0,map.y,ly);
   for i:=max(0,x1) to min(map.x,x2) do
    if map.land[y2]^[i].land and cwater>0 then
    begin
@@ -2237,6 +2386,7 @@ begin
   know:=false; see:=false;
   barrel:=monster[tip].h=0;
   if barrel then begin ai:=false; dest:=left;end;
+  key:=[];
 end;
 procedure tobj.init(ax,ay,adx,ady:real; af:boolean);
 begin
@@ -2370,8 +2520,11 @@ begin
   reset(ff,1);
   ver:=-1;
   blockread(ff,capt,sizeof(capt));
-  if capt=origlev then ver:=1;
-  if capt=lever00 then ver:=0;
+  if capt=lever00 then ver:=0 else
+  if (capt[1]=origlev[1])and(capt[2]=origlev[2]) then
+  begin
+    ver:=vl(system.copy(capt,3,2));
+  end;
   if ver=-1 then begin close(ff); exit; end;
   begin
     done;
@@ -2388,6 +2541,13 @@ begin
   begin
     blockread(ff,mnode,4);
     blockread(ff,reserved,16);
+  end;
+  copy:='';
+  com:='';
+  if ver>1 then
+  begin
+    blockread(ff,copy,256);
+    blockread(ff,com,256);
   end;
     map.clear; {delete all records}
     create(x,y,dx,dy,name);
@@ -2428,9 +2588,11 @@ begin
     reloadpat;
   end;
   close(ff);
+  deltanode;
 end;
 procedure tmap.save;
-var ff:file;
+var
+  ff:file;
   mpat,mmon,mitem,mf,i,j,mnode:longint;
   mon:record
     x,y,tip:integer;
@@ -2461,6 +2623,8 @@ begin
   mnode:=0;
   for i:=0 to maxnode do if n^[i].enable then inc(mnode);    blockwrite(ff,mnode,4);
   blockwrite(ff,reserved,16);
+  blockwrite(ff,copy,256);
+  blockwrite(ff,com,256);
 
 {  blockwrite(ff,maxpl,4);}
   for i:=0 to y-1 do blockwrite(ff,land[i]^,x*2);
@@ -2635,6 +2799,17 @@ begin
   fillchar32(b^,0,sizeof(b^),0);        for i:=0 to maxpul do b^[i].new;
   fillchar32(n^,0,sizeof(n^),0);        for i:=0 to maxnode do n^[i].new;
   fillchar32(e^,0,sizeof(e^),0);
+  if (x<>0)and(land[1]<>nil) then
+  begin
+  for i:=0 to defy-1 do
+    begin
+      fillchar(land[i]^,defx*2,0);
+    end;
+    for i:=0 to y-1 do putpat(i,0,1,1);
+    for i:=0 to y-1 do putpat(i,x-1,1,1);
+    for i:=0 to x-1 do putpat(0,i,1,1);
+    for i:=0 to x-1 do putpat(y-1,i,1,1);
+  end;
 end;
 procedure tmap.new;
 var i:longint;
