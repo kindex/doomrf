@@ -27,7 +27,7 @@ const
   maxmon=96;
   maxitem=128;
   maxf=32;
-  maxpix=1024;
+  maxpix=1500;
   maxpul=128;
   maxexpl=32;
   maxmontip=32;
@@ -82,7 +82,7 @@ type
   tkeys=array[1..maxkey]of boolean;
 const
   origlev:tcapt='FLEV';
-  blood:tcolor=(m:180; r:12; del: 3.5);
+  blood:tcolor=(m:180; r:12; del: 6{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
   {esc Left Right Fire Jump}
   ckey:array[1..2,1..maxkey]of byte=(
@@ -825,7 +825,7 @@ begin
 end;
 function tmon.takeweap(n:tmaxweapon):boolean;
 begin
-  if (weapon[n].cool>=weapon[weap].cool)and not(n in w) then weap:=n;
+  if {(weapon[n].cool>=weapon[weap].cool)and }not(n in w) then weap:=n;
   if weap=0 then weap:=n;
   include(w,n);
   {error mg}
@@ -1567,7 +1567,7 @@ end;
 procedure tpix.move;
 begin
   dec(life);
-  if life=0 then begin done; exit; end;
+  if (life=0)or((abs(dx)+abs(dy))<0.01*ms) then begin done; exit; end;
   tobj.move;
 end;
 procedure tobj.move;
@@ -1575,7 +1575,7 @@ var
   savex,savey:real;
   x1,y1,x2,y2,i,j:integer;
 begin
-  dy:=dy+map.g;
+  dy:=dy+map.g*speed;
   savex:=x;
   savey:=y;
   x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
@@ -1927,8 +1927,8 @@ var
 begin
   x1:=(dx) div 8;
   y1:=(dy) div 8;
-  for i:={minx div 8}-5 to (maxx-minx) div 8+1 do
-    for j:={miny div 8}-5 to (maxy-miny) div 8+1 do
+  for i:={minx div 8}-8 to (maxx-minx) div 8+1 do
+    for j:={miny div 8}-8 to (maxy-miny) div 8+1 do
     if (j+y1<y)and(i+x1<x)then
     if (j+y1>=0)and(i+x1>=0)then
      if land[j+y1]^[i+x1].vis<>0 then
