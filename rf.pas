@@ -6,8 +6,8 @@ uses mygraph,mycrt,api,mouse,wads,F32MA;
 const
   ppm=14; {pixel per meter (from plays.bmp)}
   ms=ppm/30; { meter/sec}
-  ms2=ms/30; { meter/sec}
-  wadfile='doom2d.wad';
+  ms2=ms/30; { meter/sec2}
+  wadfile='513.wad';
   game='DooM RF';
   version='0.05';
   data='3.3.2001';
@@ -328,7 +328,7 @@ begin
 end;
 function exist(s:string):boolean;
 begin
-  exist:=fexist(s+'.bmp')or fexist(dbmp+s+'.bmp'){ or w.exist(s)};
+  exist:=fexist(s+'.bmp')or fexist(dbmp+s+'.bmp') or w.exist(s);
 end;
 procedure tbmp.save;
 var f:file;
