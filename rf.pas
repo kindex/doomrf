@@ -4,27 +4,18 @@
 program special_for_puh; {First verion: 27.2.2001}
 uses mygraph,mycrt,api,mouse,wads;
 const
-  wadfile='513.wad';
-  data='28.2.2001 Extractor';
+  wadfile='doom2d.wad';
+  data='28.2.2001';
   maxx=300;
   maxy=300;
   maxpat=300;
+  cwall = 1 shl 0;
+  cstand= 1 shl 1
+  cwater= 1 shl 2;
+  clava = 1 shl 3;
 type
+   real=single;
    tnpat=0..maxpat;
-  tbitmap=record
-     caption:array[1..2]of char; {'BM'}
-     Size  : longint;   {X*Y+FMT+PAL}
-     Reserved1,Reserved2 : word;
-     fmtsize     : longint;   {FMT}
-     USize       : longint;   {40 ?}
-     X,Y         : longint;
-     pages      : word; {1}
-     Bits    : word; {8}
-     Compression   : longint;{0}
-     ImageSize     : longint;{x*y}
-     XPPM,YPPM : longint; {0}
-     ClrUsed, ClrImportant  : longint  {?}
-   end;
    ttimer=object
       hod:longint;  fps:extended;
       tik:record cur,start:extended; h,m,s,s100:word; end;
@@ -46,7 +37,6 @@ type
       procedure put(tx,ty:longint);
       procedure putblack(tx,ty:longint);
       procedure done;
-      procedure save;
   end;
   tmapelement=record
     land,vis:byte;
@@ -56,54 +46,44 @@ type
   tmap=object
     land:tland;
     x,y,dx,dy:longint;
+    g:real;
     procedure init(ax,ay,adx,ady:longint);
     procedure done;
     procedure draw;
   end;
+  tobj=object
+    mx,my:integer;
+    x,y,dx,dy:real;
+    procedure move;
+  end;
+  tmon=object(tobj)
+
+  end;
+  tpul=object(tobj)
+
+  end;
+  titem=object(tobj)
+
+  end;
+  arrayofstring=array[1..7000]of string[8];
 var
   time:ttimer;
   w:twad;
   map:tmap;
   p:array[0..maxpat]of tbmp;
   lands:array[byte]of 0..maxpat;
+  names:array[byte]of string[8];
+  allwall:^arrayofstring;
+  maxlands:longint;
+  mx,my:longint;
+  debug:boolean;
+  cur:tnpat;
 (************************** IMPLEMENTATION **********************************)
-procedure tbmp.save;
-var f:file;
-   b:tbitmap;
-   t,i,j,ost:longint;
+procedure tobj.move;
 begin
-  assign(f,name+'.bmp');
-  rewrite(f,1);
-  with b do
-  begin
-     X:=self.x; Y:=self.y;
-    caption:='BM';
-    size:=256*4+54+x*y;
-    Reserved1:=0; Reserved2:=0;
-    fmtsize:=54+256*4;   {FMT}
-    USize:=40;   {40 ?}
-    pages:=1; {1}
-    Bits:=8; {8}
-    Compression:=0;{0}
-    ImageSize:=x*y;{x*y}
-    XPPM:=0; YPPM:=0; {0}
-    ClrUsed:=256; ClrImportant:=256;  {?}
-  end;
-  blockwrite(f,b,54);
-  blockwrite(f,pal^,256*4);
-  case x mod 4 of
-  0: ost:=0;
-  1: ost:=3;
-  2: ost:=2;
-  3: ost:=1;
-  end;
-  t:=0;
-  for i:=y-1 downto 0 do
-  begin
-    blockwrite(f,n^[i*x],x);
-    if ost<>0 then blockwrite(f,t,ost);
-  end;
-  close(f);
+  dy:=dy+map.g;
+  x:=x+dx;
+  y:=y+dy;
 end;
 procedure tmap.done;
 var i:longint;
@@ -142,9 +122,6 @@ begin
       w.read(pal^[i*4+2],1);
       w.read(pal^[i*4+1],1);
       w.read(pal^[i*4+0],1);
-      pal^[i*4+2]:=pal^[i*4+2]*4;
-      pal^[i*4+1]:=pal^[i*4+1]*4;
-      pal^[i*4+0]:=pal^[i*4+0]*4;
     end;
     setfullpal;
   end
@@ -200,8 +177,8 @@ var
 begin
   name:=ss;
   dx:=0; dy:=0;
-  if pos('.',name)=0 then name:=name+'.bmp';
-  assign(f,name);
+  if pos('.',name)=0 then ss:=ss+'.bmp';
+  assign(f,ss);
   {$i-}reset(f,1);{$i+}
   if ioresult<>0 then begin x:=0; y:=0; exit; end;
   seek(f,18); blockread(f,x,4);  blockread(f,y,4);
@@ -230,7 +207,7 @@ procedure ttimer.move;
 begin
   inc(hod);  gettime;
 {  getfps;}
-  if hod=50 then begin getfps; clear;end;
+  if hod=100 then begin getfps; clear;end;
 end;
 procedure ttimer.gettime;
 begin
@@ -256,12 +233,14 @@ begin
   assign(f,s);
   reset(f,1);
   seek(f,54);
+  for i:=0 to 256*4 do pal^[i]:=pal^[i]*4;
   blockwrite(f,pal^,256*4);
   close(f);
 end;
 function loadbmp(s:string):tnpat;
 var i:longint;
 begin
+  s:=upcase(s);
   for i:=1 to maxpat do if p[i].name=s then begin loadbmp:=i; exit; end;
   for i:=1 to maxpat do
     if p[i].x=0 then
@@ -270,58 +249,60 @@ begin
      loadbmp:=i;
      exit;
     end;
+  loadbmp:=0;
+end;
+procedure loadwalls;
+var dat:text;
+  k,i:longint;
+begin
+  assign(dat,'wall.dat');
+  reset(dat);
+  readln(dat,k);
+  if debug and(k>50) then k:=50;
+  getmem(allwall,k*9);
+  for i:=1 to k do readln(dat,allwall^[maxlands]);
+  maxlands:=0;
+  while not eof(dat)do
+  begin
+    inc(maxlands);
+    readln(dat,allwall^[maxlands]);
+  end;
+  close(dat);
 end;
 (******************************** PROGRAM ***********************************)
-var i,m:longint;
+var i:longint;
 begin
+{  debug:=true;}
   w.load(wadfile);
-  map.init(100,100,0,0);
-  init320x200; loadfont('8x8.fnt');
-  loadpal('playpal.bmp');
-  w.findfirst('*');
-  w.findstr:='*';
-{  w.findn:=680;}
-  m:=loadbmp(w.cur.getname);
-  while not((w.error<>0)or(p[m].x<>0)) do
-  begin
-    w.findnext;
-    m:=loadbmp(w.cur.getname);
- end;
+  map.init(100,100,0,0); map.g:=-0.1;
+  init320x200; loadfont('8x8.fnt');     clear;
+  loadpal('playpal');
+{  w.findfirst('playa'); w.findstr:='*';}
+  loadwalls;
+  cur:=loadbmp('cursor');
+  for i:=1 to 100 do
+    map.land[random(100)]^[random(100)].vis:=random(198)+1;
   time.clear;
   repeat
     time.move;
+    mx:=mouse.x;
+    my:=mouse.y;
     if keypressed then
-    case system.upcase(readkey) of
-      ' ': begin
-             p[m].done;
-             repeat
-               w.findnext;
-               p[m].load(w.cur.getname);
-             until (w.error<>0)or(p[m].x<>0)or(w.n=w.findn);
-{             p[m].save;}
-           end;
-      'E':
-      begin
-             p[m].done;
-             repeat
-               w.findnext;
-               p[m].load(w.cur.getname);
-             until (w.error<>0)or(p[m].x<>0)or(w.n=w.findn);
-             p[m].save;
-           end;
+    case readkey of
       #27: break;
     end;
 {    p.done;    p.load('puh8.bmp');}
     clear;
     map.draw;
-    p[m].put(160,100);
     print(100,190,white,st(w.findn)+'/'+st(w.n));
-    print(200,190,white,st(p[m].x)+'x'+st(p[m].y));
     print(290,190,white,st0(round(time.fps),3));
     print(10,190,white,w.cur.getname);
+    p[cur].putblack(mx,my);
     screen;
   until (w.n=w.findn);
   savepal('doom.pal');
   closegraph;
+  map.done;
   w.find('playpal');
+  writeln(memavail);
 end.
