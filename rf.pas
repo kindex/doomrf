@@ -80,9 +80,10 @@ const
   (tip:12; bot:1; scr:none; name:'bot4')
   );
   maxallpl:integer=4;
-  blood:tcolor=(m:180; r:12; del: 6{3.5});
+  blood:tcolor=(m:180; r:12; del: 4{6}{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
-  blow:tcolor=(m:160; r:8; del:2);
+  blow:tcolor=(m:160; r:8; del:2.5);
+  ice:tcolor=(m:186; r:10; del:2.5);
 type
 {   tnpat=0..maxpat;}
    tbitmap=record
@@ -152,9 +153,9 @@ type
      who,lastwho: 0..maxmon;
      dest:tdest;
      tip: tmaxmontip;
-     delay,deldam,statedel,vis,savedel,hero,god:longint;
+     delay,freez,fired,deldam,statedel,vis,savedel,hero,god:longint;
      state,curstate:tstate;
-     health,armor,fired,buhalo,vempire,oxy,oxylife:real;
+     health,armor,buhalo,vempire,oxy,oxylife:real;
      weap: tmaxweapon;
      w:set of tmaxweapon;
      key:set of 1..maxkey;
@@ -182,7 +183,7 @@ type
      procedure jump;
      procedure move; virtual;
      procedure checkstep;
-     procedure damage(ax,ay:integer; hit,bomb,coxy:real; dwho:integer; adx,ady: real);
+     procedure damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
      procedure setstate(as:tstate; ad: real);
      procedure setcurstate(as:tstate; ad: real);
      procedure kill;
@@ -860,10 +861,15 @@ begin
 {    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
   end;
  end;
-  if oxy<100 then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(oxy),'%');
-  if map.m^[hero].god>0 then
-    digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
   box(0,0,getmaxx,getmaxy);
+  if oxy<100 then
+    digit((x1+x2)div 2-20,(y1+y2)div 2+30,round(oxy),'%');
+  if map.m^[hero].god>0 then
+    digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
+  if map.m^[hero].freez>0 then
+    digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].freez/rtimer.fps),' ');
+{  if map.m^[hero].fired>0 then
+    digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].fired/rtimer.fps),' ');}
 end;
 procedure tmon.takebest(mode:integer);
 var i,c:integer;
@@ -950,16 +956,6 @@ begin
   seex:=map.m^[f].mx-mx;
   seey:=map.m^[f].my-my;
 end;
-
-
-
-
-
-
-
-
-
-
 procedure tplayer.move;
 var
   i:integer;
@@ -1096,6 +1092,12 @@ begin
         11: lose:=true;
         15,16{Open&Close Door}: f^[i].door(i);
         {        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
+        17: begin map.g:=map.g*1.6; f^[i].tip:=0; end;
+        18: begin map.g:=map.g/1.6; f^[i].tip:=0; end;
+        19: begin map.g:=9.8*ms2; f^[i].tip:=0; end;
+        20: begin usk:=usk*1.6; f^[i].tip:=0; end;
+        21: begin usk:=usk/1.6; f^[i].tip:=0; end;
+        22: begin usk:=ausk; f^[i].tip:=0; end;
       end;
 
    end;
@@ -1223,7 +1225,7 @@ begin
     (map.m^[i].x<(x+s))and
     (map.m^[i].y<(y+s))
     then
-      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),weapon[weap].hit,0,0,who,0,0);
+      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),weapon[weap].hit,0,0,0,who,0,0);
   end;
   delay:=round(weapon[weap].shot*mfps/speed);
   if (not ai)and(bul[weapon[weap].bul]<=0) then exit;
@@ -1333,7 +1335,12 @@ begin
     (my>ay-sy)
     then
     begin
-      map.m^[i].damage(mx,my,bul[tip].hit,0,bul[tip].fire/speed*mfps,who,dx*bloodu,dy*bloodu);
+      map.m^[i].damage(mx,my,
+      bul[tip].hit,
+      0,
+      bul[tip].fire/speed*mfps,
+      bul[tip].freez/speed*mfps,
+      who,dx*bloodu,dy*bloodu);
       map.m^[i].dx:=map.m^[i].dx+dx*0.1;
       detonate;
       exit;
@@ -1375,7 +1382,7 @@ begin
     (map.m^[i].x<(x+s))and
     (map.m^[i].y<(y+s))
     then
-      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,bomb[tip].hit,bomb[tip].fired,who,0,0);
+      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,bomb[tip].hit,bomb[tip].fired,0,who,0,0);
 end;
 procedure tmon.setstate;
 begin
@@ -1435,7 +1442,7 @@ begin
   giveweapon;
   dier;
 end;
-procedure tmon.damage(ax,ay:integer; hit,bomb,coxy:real; dwho:integer; adx,ady: real);
+procedure tmon.damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
 var
   i:integer;
 begin
@@ -1443,13 +1450,26 @@ begin
     ax:=round(x);
     ay:=round(y-getsy*6)
   end;
+  if (freez>0)and(afreez=0) then begin
+    hit:=hit*10;
+    bomb:=bomb*10;
+  end;
+  if health>300 then begin
+    coxy:=0;
+    afreez:=0;
+  end;
   know:=true;
   if barrel and not life then exit;
   if god<>0 then exit;
 {  if fired=0 then }
-  fired:=fired+coxy{*byte(hero>0)};
+  fired:=fired+round(coxy){*byte(hero>0)};
+  freez:=freez+round(afreez);
+
+  if afreez>0 then fired:=0;
+  if coxy>0 then freez:=0;
+
   if armor=0 then
-  health:=health-hit-bomb
+   health:=health-hit-bomb
   else
   begin
     health:=health-(hit+bomb)/5;
@@ -1461,8 +1481,13 @@ begin
   begin
     health:=0;
   end;
-  setstate(hack,0.1);
+  if freez=0 then
+    setstate(hack,0.1);
   if not barrel then
+  if freez>0 then
+  for i:=1 to min(32,round((hit+bomb)*5)) do
+    map.randompix(ax,ay,dx+adx,dy+ady,5,5,ice)
+  else
   for i:=1 to min(64,round((hit+bomb)*10)) do
     map.randompix(ax,ay,dx+adx,dy+ady,5,5,blood)
   else
@@ -1470,7 +1495,7 @@ begin
     map.randompix(ax,ay,dx+adx,dy+ady,5,5,blow);
 
   if health<=0 then
-    if bomb>0 then explode
+    if (bomb>0)or(freez>0) then begin explode; freez:=0; end
     else kill;
 end;
 procedure tmap.randompix;
@@ -1484,6 +1509,8 @@ var i:integer;
 begin
   if not life then begin inc(delay,2);
     if delay>truptime*mfps/speed then begin done; exit; end; end;
+  if freez>0 then dec(freez);
+  if freez=0 then begin
   if ai then moveai;
   if kleft in key then runleft;
   if kright in key then runright;
@@ -1493,22 +1520,28 @@ begin
   if kprev in key then takeprev;
   if kdown in key then begin down:=true; if inwall(cwater) then dy:=dy+monster[tip].jumpy*0.25; end
     else down:=false;
+  end;
+
   tobj.move;
+  if freez>0 then exit;
   if deldam>0 then dec(deldam);
 
   if inwall(clava) and (deldam=0) then
   begin
-    damage(mx,my,0,5,2,0,0,0);
+    damage(mx,my,0,5,2,0,0,0,0);
     deldam:=round(mfps/speed);
   end;
 
   if inwall(cfunc)then
    with map do
+   if life then
     for i:=0 to maxf do
      if f^[i].enable then
      if (mx>=f^[i].x)and (my>=f^[i].y)and
-     (mx<=f^[i].x+f^[i].getsx)and (my<=f^[i].y+f^[i].getsy) then
-      if f^[i].tip=12 then damage(0,0,0,33,0,hero,0,0);
+     (mx<=f^[i].x+f^[i].getsx)and (my<=f^[i].y+f^[i].getsy) then begin
+      if f^[i].tip=12 then damage(0,0,0,33,0,0,hero,0,0);
+      if f^[i].tip=23 then damage(0,0,0,0,0,20,hero,0,0);
+     end;
 
   if deldam=0 then
   begin
@@ -1517,7 +1550,7 @@ begin
       fired:=0; {OXY}
       deldam:=round(0.1*mfps/speed);
       if oxy>0 then oxy:=oxy-1;
-      if (oxy=0)and(hero>0) then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,who,0,0);end;
+      if (oxy=0)and(hero>0) then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,0,who,0,0);end;
     end else
     begin
       if oxy=0 then oxy:=20;
@@ -1547,10 +1580,13 @@ begin
   begin
     map.initbomb(mx,my,bombfire,0);
     deldam:=round(0.1*mfps/speed);
+{    dec(fired);}
   end;
-  if fired>0 then damage(mx,my,0,oxysec*speed/mfps,0,0,0,0);
-  fired:=fired-1;
-  if fired<0 then fired:=0;
+  if fired>0 then begin
+    damage(mx,my,0,oxysec*speed/mfps,0,0,0,0,0);
+    dec(fired);
+    if fired<0 then fired:=0;
+  end;
   if delay>0 then dec(delay);
   if god>0 then dec(god);
   case curstate of
@@ -3178,6 +3214,8 @@ begin
   end;
   xorwrite(ff,player,sizeof(player));
   xorwrite(ff,must,sizeof(must));
+  xorwrite(ff,map.g,sizeof(map.g));
+  xorwrite(ff,usk,sizeof(usk));
   close(ff);
 end;
 procedure loadgame(a: integer);
@@ -3209,6 +3247,8 @@ begin
   end;
   xorread(ff,player,sizeof(player));
   xorread(ff,must,sizeof(must));
+  xorread(ff,map.g,sizeof(map.g));
+  xorread(ff,usk,sizeof(usk));
   close(ff);
   loaded:=true;
 end;
@@ -3373,7 +3413,6 @@ begin
 {Load first level}
   level.first:=true;
   map.new;
-  map.g:=9.8*ms2;
  repeat
   mainmenu;
   if level.endgame then break;
@@ -3411,6 +3450,7 @@ begin
     ddx:=6; ddy:=6;    Sensetivity(12,12);
   end;
   mousebox(0,0,getmaxx,getmaxy); loaded:=false;
+  map.g:=9.8*ms2; usk:=ausk;
   repeat
     rtimer.easymove;time.move;  mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
     case res of
@@ -3480,7 +3520,7 @@ begin
        if pos('kill',keybuf)>0 then
          begin
            for i:=1 to level.maxpl do
-              map.m^[player[i].hero].damage(map.m^[player[i].hero].mx,map.m^[player[i].hero].my,0,10000,100,0,0,-5);
+              map.m^[player[i].hero].damage(map.m^[player[i].hero].mx,map.m^[player[i].hero].my,0,10000,100,0,0,0,-5);
            keybuf:='';
           end;
        if pos('all',keybuf)>0 then
@@ -3525,6 +3565,9 @@ begin
     rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
     if level.editor then p^[cur].sprite(mx,my);
 
+{    for i:=0 to 255 do
+    for j:=0 to 5 do
+      putpixel(i,j,i);}
     screen;
 {    speed:=1;}
     if time.fps<>0 then speed:=mfps/time.fps*usk;
