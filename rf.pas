@@ -5,16 +5,14 @@ program RF; {First verion: 27.2.2001}
 uses crt,mycrt,mouse,wads,dos,fpgraph,grx,sprites,rfunit,timer,api,ports;
 const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   game='Doom RF';
-  version='1.47';
-  data='1.1.2002';
+  version='1.49';
+  data='11.1.2002';
   title:string='DOOM 513' {+version+' ['+data+']'};
   comment='Beta fersion *** Freeware *** For testers and designers';
   shortintro=game+' ['+version+']';
   menutitle='DOOM 513';
 
   accel:integer=-1;
-  mainmod:string='RF';
-  runmod:string='RF';
   levdir:string='RF\Levels\';
   savedir:string='RF\Saves\';
   levext='.lev';
@@ -387,7 +385,7 @@ type
     max,cur:integer;
     name:array[0..40]of string[8];
     skill: longint;
-    editor,endgame,multi,death,first,rail,look,sniper,reswap,started:boolean;
+    editor,endgame,multi,death,first,rail,look,sniper,reswap,started,cheater:boolean;
     maxpl:integer;
     procedure setup;
     function loadini(a,b:string):boolean;
@@ -437,6 +435,7 @@ var
 
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
+
 procedure outtro;
 var
   i:integer;
@@ -458,6 +457,28 @@ begin
 //  writeln(':)');
 end;
 procedure firstintro;
+var
+  i,s:integer;
+begin
+  clrscr;
+  textattr:=4*16+15;
+  for i:=0 to 79 do mem[segb800:i*2+1]:=textattr;
+//  textcolor(15);
+  s:=(80-length(title))div 2;
+  for i:=1 to length(title) do
+    mem[segb800:(i+s)*2]:=byte(title[i]);
+
+//  writeln(title:(80-length(title))div 2);
+//  writeln(title:(80-length(title))div 2+length(title));
+
+  textattr:=7;
+  window(1,2,80,25);
+  outtro;
+//  writeln('A ', title);
+//  manualinfo;
+//  writeln('Free RAM: ',memavail);
+end;
+{procedure firstintro;
 var i:integer;
 begin
   clrscr;
@@ -469,7 +490,7 @@ begin
   outtro;
 //  manualinfo;
 //  writeln('Free RAM: ',memavail);
-end;
+end;}
 function tmon.clever: boolean;
 begin
   clever:=(monster[tip].health>200)or(level.sniper);
@@ -585,10 +606,10 @@ begin
   clear;
   box(0,0,getmaxx,getmaxy);
   c:=1;
-  while exist(a+st(c)) do inc(c);
+  while bmpexist(a+st(c)) do inc(c);
   dec(c);
   c:=random(c)+1;
-  if exist(a+st(c)) then begin
+  if bmpexist(a+st(c)) then begin
     putbmpall(a+st(c));
     rb.print((getmaxx-rb.width(b)) div 2,getmaxy-10,b);
     screen;
@@ -600,6 +621,7 @@ begin
   clear;
 
 //  putbmpall(winallbmp);
+
   putlogo(winallbmp,'',0);
 
   wb.print((getmaxx-rb.width(wintext1))div 2,getmaxy div 2-40,wintext1);
@@ -707,6 +729,8 @@ begin
   assign(f,a{+dotmod});
 {$i-}  reset(f); {$i+}
   if ioresult<>0 then begin writeln('WARNING: ',a,' file not found !!!'); exit;end;
+  checkcrc(a);
+
   while not eof(f) do
   begin
     readln(f,s);
@@ -1217,7 +1241,7 @@ begin
   for i:=max(0,ax div 8) to min(map.x-1,(ax+asx)div 8) do
     for j:=max(0,ay div 8) to min(map.y-1,(ay+asy)div 8) do
      map.land[j]^[i].land:=map.land[j]^[i].land or cfunc;
-  if (at=14 {target})and(map.f^[an-1].tip=13{Teleport})then begin
+  if (at=14 {target})and(map.f^[an-1].tip in [13,25]{Teleport})then begin
     sx:=map.f^[an-1].sx;
     sy:=map.f^[an-1].sy;
   end;
@@ -2422,12 +2446,14 @@ begin
   if not level.multi then
   if hero>0 then
     info.add('Вы убиты !!!',red,100)
-  else
-    if (dwho>=0)and(dwho<>who) and(map.m^[dwho].hero>0) then
-      info.add(monster[tip].name+' убит',red,5)
-     else
-      info.add(monster[tip].name+' совершил самоубийство',red,5);
-
+  else begin
+    if (dwho<>who)and(map.m^[dwho].hero>0) then
+      info.add(monster[tip].name+' убит',red,5) else
+    if (dwho=who)then
+      info.add(monster[tip].name+' совершил самоубийство',red,5)
+    else
+      info.add(monster[tip].name+' убит своими',red,5);
+  end;
  if level.multi then begin
   if (not level.death)and(hero>0)and(player[hero].bot>0)and (map.m^[dwho].hero>0)and(who<>dwho) then begin
     info.add(gett(hero)+': Не стреляй в меня, '+gett(map.m^[dwho].hero)+', - я из твоей команды !!!',white, 10);
@@ -2436,7 +2462,7 @@ begin
     if who<>dwho then
       info.add(gett(map.m^[dwho].hero)+' убил '+gett2(hero),botcol[map.m^[dwho].hero], 5)
     else
-      info.add(gett(map.m^[dwho].hero)+' совершил самоубийство :)',botcol[map.m^[dwho].hero], 5);
+      info.add(gett(map.m^[dwho].hero)+' совершил самоубийство',botcol[map.m^[dwho].hero], 5);
   end;
  end;
   if (map.m^[who].hero=0)and(dwho>=0)and(map.m^[dwho].hero>0) then
@@ -2613,7 +2639,7 @@ begin
   if life then begin
   if kdown in key then
   begin
-    if inwater then dy:={dy+}monster[tip].jumpy*0.5
+    if inwater or (g=0)then dy:={dy+}monster[tip].jumpy*0.5*usk
     else
      if not inwall(cstand) and ((getgrid and cstand)=0) then begin
        savedel:=0;
@@ -2647,9 +2673,9 @@ begin
   if jumpfr>0 then dec(jumpfr);
   if jumpfr=0 then
     if kjump in key then begin
-     if not inwater then jump
+     if (not inwater)and(g<>0) then jump
      else
-      dy:=-{dy+}monster[tip].jumpy*0.6;
+      dy:=-{dy+}monster[tip].jumpy*0.6*usk;
     end;
 
   if knext in key then takenext;
@@ -2823,7 +2849,7 @@ begin
     tx:=sx+tex;
     ty:=sy+tey;
 
-    if debug then map.initbomb(tx*8,ty*8,reswapbomb,0);
+//    if debug then map.initbomb(tx*8,ty*8,reswapbomb,0);
 
     if (ty<=0)or(ty>=map.y-1)or(tx<=0)or(tx>=map.x-1) then begin
        see:=false;
@@ -3683,7 +3709,7 @@ begin
      (mx<=f^[i].x+f^[i].getsx)and
      (my<=f^[i].y+f^[i].getsy)
       then case f^[i].tip of
-        13{Teleport}: begin
+        13,25{Teleport}: begin
           self.x:=self.x+(f^[i+1].x-f^[i].x);
           self.y:=self.y+(f^[i+1].y-f^[i].y);
           self.mx:=round(self.x); self.lx:=self.mx div 8;
@@ -3692,7 +3718,7 @@ begin
           savey:=self.y;
           upr:=false;
           check:=true;
-          if typeof(tPix)<>typeof(self)then
+          if (typeof(tPix)<>typeof(self)) and (f^[i].tip=13)then
             initbomb(round(self.x),round(self.y-self.getsy*4),reswapbomb,0);
           exit;
         end;
@@ -3950,8 +3976,8 @@ begin
    dest]].spriteo(mx-ax,my-ay,c);
 
   end;
-  if debug then
-    rb.print(mx-ax,my-ay,st(who)+'->'+st(target.mon)+' - '+st(byte(see)));
+{  if debug then
+    rb.print(mx-ax,my-ay,st(who)+'->'+st(target.mon)+' - '+st(byte(see)));}
 //  dec(my);
 {  putpixel(mx-ax,my-ay,white);}
 end;
@@ -4644,7 +4670,7 @@ begin
     if (my>=(getmaxy-4))and(dy div 8+20<y) then inc(dy,scroolspeed);
   end;
 end;
-procedure loadwalls;
+procedure loadwalls(a:string);
 var dat:text;
   k,i:longint;
 begin
@@ -4654,8 +4680,9 @@ begin
   while not seekeof(dat) do begin readln(dat); inc(k);end;
   close(dat);}
 
-  assign(dat,inidir+'wall.ini');
-  reset(dat);
+  assign(dat,a{inidir+'wall.ini'});
+{$i-}  reset(dat); {$i+}
+  if ioresult<>0 then exit;
 {  readln(dat,k);}
 {  if debug and(k>10) then k:=10;}
 //  getmem(allwall,(k+1)*9);
@@ -5094,7 +5121,9 @@ begin
    with level do
    case menu(6,1,'') of
     1: begin // Single player game
+         debug:=false;
          loadlevellist('single');
+         level.cheater:=false;
          level.skill:=skillmenu;
          level.first:=level.skill<>0;
          level.cur:=0;
@@ -5107,7 +5136,9 @@ begin
          level.setup;
        end;
     2: begin // Cooperative
+         debug:=false;
          loadlevellist('coop');
+         level.cheater:=false;
          level.skill:=skillmenu;
          botmenu;
          if maxallpl=0 then continue;
@@ -5116,7 +5147,9 @@ begin
          level.setup;
        end;
     3: begin // DeathMatch
+         debug:=false;
          level.death:=true;
+         level.cheater:=false;
          loadlevellist('death');
          level.skill:=skillmenu;
          botmenu;
@@ -5136,7 +5169,8 @@ begin
          end else continue;
        end;
     4: begin loadgame(getsave('загрузить')); if loaded then break; end;
-    5: begin winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;end;
+    5: begin level.cheater:=false;
+        winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;end;
     0,6: begin endgame:=true; first:=true;end;
    end;
  until level.first;
@@ -5156,17 +5190,17 @@ begin
   level.next;
   time.clear;
 end;
-procedure loading;
+procedure loading(a:string);
 begin
-  lastinidir:=inidir;
+//  lastinidir:=inidir;
 {  write(load[1]);}  {loadbots('bot.ini');}
-{  write(load[2]);}  loadwalls;
-{  write(load[3]);}  loadbombs;
-{  write(load[4]);}  loadbullets;
-{  write(load[5]);}  loadweapons;
-{  write(load[6]);}  loaditems;
-{  write(load[7]);}  loadmonsters;
-{  write(load[8]);}  loadfuncs;
+{  write(load[2]);}  loadwalls(a+'wall.ini');
+{  write(load[3]);}  loadbombs(a+'bomb.ini');
+{  write(load[4]);}  loadbullets(a+'bullet.ini');
+{  write(load[5]);}  loadweapons(a+'weapon.ini');
+{  write(load[6]);}  loaditems(a+'item.ini');
+{  write(load[7]);}  loadmonsters(a+'monster.ini');
+{  write(load[8]);}  loadfuncs(a+'func.ini');
 end;
 
 procedure addbmpdirs(a:string);
@@ -5208,8 +5242,8 @@ begin
   else
   levdir:=mainmod+'\Levels\';
 
-  maininidir:=mainmod+'.\';
-  inidir:=runmod+'.\';
+  maininidir:=mainmod+'\';
+  inidir:=runmod+'\';
   savedir:=runmod+'\Saves\';
 
   fillchar(p,sizeof(p),0);
@@ -5231,7 +5265,9 @@ begin
 //  level.loadini(runmod+'\mod.ini');
   loadmodfile(a+'\mod.ini');
   {  if upcase(lastinidir)<>upcase(inidir) then }
-  loading;
+  loading(maininidir);
+  if (maininidir<>inidir) then
+    loading(inidir);
 end;
 
 procedure movemouse;
@@ -5337,46 +5373,58 @@ begin
               if map.m^[player[i].hero].health<=0 then map.m^[player[i].hero].health:=0.1;
             end
             else map.m^[player[i].hero].god:=0;
-           keybuf:='';
+           keybuf:=''; level.cheater:=true;
           end;
        if (pos('iddqd',keybuf)>0) then
          begin
            for i:=1 to level.maxpl do
               map.m^[player[i].hero].damage(map.m^[player[i].hero].mx,map.m^[player[i].hero].my,0,10000,100,0,-1,0,-5);
-           keybuf:='';
+           keybuf:=''; //level.cheater:=true;
           end;
        if (pos('kill',keybuf)>0) then
          begin
            for i:=0 to maxmon do
              if map.m^[i].life and (map.m^[i].hero=0)then
               map.m^[i].damage(map.m^[i].mx,map.m^[i].my,0,10000,100,0,-1,0,-5);
-           keybuf:='';
+           keybuf:=''; level.cheater:=true;
           end;
        if pos('all',keybuf)>0 then
          begin
            for i:=1 to level.maxpl do
             for j:=1 to 39 do
               map.m^[player[i].hero].takeitem(j);
-           keybuf:='';
+           keybuf:=''; level.cheater:=true;
           end;
        if pos('open',keybuf)>0 then begin
            for i:=0 to maxf do
              if map.f^[i].tip=15 then map.f^[i].door(i);
-           keybuf:='';
+           keybuf:=''; level.cheater:=true;
        end;
        if pos('tank',keybuf)>0 then
          begin
            for i:=1 to level.maxpl do
             for j:=41 to 51 do
               map.m^[player[i].hero].takeitem(j);
-           keybuf:='';
+           keybuf:=''; level.cheater:=true;
+        end;
+       if pos('fly',keybuf)>0 then
+         begin
+           for i:=1 to level.maxpl do
+             map.m^[player[i].hero].g:=0;
+           keybuf:=''; level.cheater:=true;
+        end;
+       if pos('speed',keybuf)>0 then
+         begin
+           for i:=1 to level.maxpl do
+             map.m^[player[i].hero].usk:=3;
+           keybuf:=''; level.cheater:=true;
         end;
       end;
       end;
        if pos('win',keybuf)>0 then begin
            for i:=1 to level.maxpl do
               player[i].win:=true;
-         keybuf:='';
+         keybuf:='';  if not level.death then level.cheater:=true;
        end;
 end;
 procedure checkwingame;
@@ -5550,12 +5598,16 @@ var
   i,j,cx,cy: integer;
   a:array[1..maxplays]of ttt;
   temp: ttt;
+function get(a:longint): real;
+begin
+  if a=0 then get:=0.5 else get:=a;
+end;
 begin
   cx:=1; cy:=getmaxy-10*(level.maxpl+1);
 
   for i:=1 to level.maxpl do begin
     a[i].who:=i;
-    a[i].pr:=(player[i].frag+0.1)/(player[i].die+0.01);
+    a[i].pr:=(get(player[i].frag))/(get(player[i].die));
   end;
 
   for i:=1 to level.maxpl-1 do
@@ -5665,6 +5717,8 @@ begin
       p[cur].sprite(mx,my);
     end;
 
+    if level.cheater then wb.print(275,200,'Cheater');
+
     rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
 //    rb.print(getmaxx-24,getmaxy-16,st0(hod,3));
 
@@ -5675,7 +5729,7 @@ begin
       reverse: screenr;
     end;
 
-//    crt.delay(200);
+    crt.delay(200);
 
     checktimer;
     checkwingame;
@@ -5687,5 +5741,5 @@ begin
 //  map.done;
 
   firstintro;   //  outtro;
-  WEAPONINFO;
+//  WEAPONINFO;
 end.
