@@ -2,7 +2,7 @@
 { $A+,B+,D+,E-,F+,G+,I+,L+,N+,O+,P+,Q+,R+,S+,T+,V+,X+,Y+ Debug}
 {$M $fff0,0,655360}
 program RF; {First verion: 27.2.2001}
-uses crt,mycrt,api,mouse,wads,F32MA,dos,graphics,grafx;
+uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx,grx;
 {$ifndef dpmi} Real mode not supported {$endif}
 const
   res:integer=0;
@@ -12,13 +12,13 @@ const
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.2.7';
-  data='15.4.2001';
+  version='0.2.9';
+  data='27.5.2001';
   title='DOOM 513: Richtiger Faschist '+version+' ['+data+']';
   company='IVA vision <-=[■]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
   levels='ICE & kindeX';
-  comment='BOT Test *** Freeware *** Special for PROGMEISTARS !';
+  comment='Last Beta *** Freeware *** Special for PROGMEISTARS !';
   levext='.lev';
   mousepl=4;
   playdefitem=2;
@@ -41,7 +41,7 @@ const
   maxweapon=32;  maxbomb=16;  maxnode=300;
   maxlink=3; {0..3  (4)}
   maxbul=16;
-  maxit=128;
+  maxit=96;
   maxfname=16;
   scry:integer=19*8;  scrx:integer=260;
   maxt=1600 div 8;
@@ -51,6 +51,7 @@ const
   maxkey=7;  scroolspeed=4;
   truptime=30;
   reswaptime:integer=60;  monswaptime:integer=30;
+  botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
   (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  '7',  '8' );
   ednodestr:array[1..4]of string[16]=
@@ -1020,6 +1021,7 @@ end;
 procedure tplayer.move;
 var
   i:integer;
+  dest:tdest;
 function getgoal:integer;
 var i,j,ge:integer;
 begin
@@ -1125,6 +1127,8 @@ begin
   if (ammo=0)and(weapon[weap].hit=0) then map.m^[hero].takenext;
   mx:=round(map.m^[hero].x);
   my:=round(map.m^[hero].y);
+  dest:=map.m^[hero].dest;
+
   with map do
    if m^[hero].life then
    begin
@@ -1195,13 +1199,15 @@ begin
       if abs(seex)>128 then wmode:=2 else
          wmode:=1;
 
-      map.m^[hero].takebest(wmode);
+      if skill>3 then map.m^[hero].takebest(wmode);
 
       if seey<0 then include(map.m^[hero].key,kjump);
       downed:=false;
-      if seex>0 then
+
+      if (seex>0)and((dest=left)or(seex>botsee[skill])) then
          begin exclude(map.m^[hero].key,kleft); include(map.m^[hero].key,kright); end
        else
+      if (seex<0)and((dest=right)or(seex<-botsee[skill])) then
          begin exclude(map.m^[hero].key,kright);include(map.m^[hero].key,kleft); end;
 
       include(map.m^[hero].key,katack);
@@ -2278,6 +2284,7 @@ procedure tobj.move;
 var
   savex,savey:real;
   x1,y1,x2,y2,i,j:longint;
+  br:boolean;
 begin
   dy:=dy+map.g*speed;
   savex:=x;
@@ -2306,12 +2313,13 @@ begin
   if not down then
   for i:=max(0,x1) to min(map.x,x2) do
   begin
+   br:=false;
    if map.land[y2]^[i].land and cwater>0 then
    begin
      standing:=true;
      dx:=dx*0.95;
      dy:=dy*0.97;
-     break;
+     br:=true;
    end;
    if map.land[y2]^[i].land and cstand>0 then
    begin
@@ -2319,7 +2327,7 @@ begin
      elevator:=true;
      dy:=-dy*getupr;
      y:=y-1;  my:=round(y); ly:=my div 8;
-     break;
+     br:=true;
    end;
    if map.land[y2]^[i].land and cshl>0 then
    begin
@@ -2327,7 +2335,7 @@ begin
      elevator:=true;
      dy:=-dy*getupr;
      y:=y-1; x:=x-1; dx:=-1; my:=round(y); ly:=my div 8;
-     break;
+     br:=true;
    end;
    if map.land[y2]^[i].land and cshr>0 then
    begin
@@ -2335,8 +2343,9 @@ begin
      elevator:=true;
      dy:=-dy*getupr;
      y:=y-1; x:=x+1; dx:=1; my:=round(y); ly:=my div 8;
-     break;
+     br:=true;
    end;
+   if br then break;
   end;
 end;
 constructor tobj.new; begin {nothing} end;
@@ -3524,14 +3533,14 @@ begin
   w.load(wadfile);
   p^[0].load('bmp\error.bmp');
   loadres;
-  write(#13#10'Боты');     loadbots('bot.ini');
-  write(#13#10'Стены');    loadwalls;
-  write(#13#10'Взрывы');   loadbombs;
-  write(#13#10'Пули');     loadbullets;
-  write(#13#10'Оружие');   loadweapons;
-  write(#13#10'Предметы'); loaditems;
-  write(#13#10'Монстры');  loadmonsters;
-  write(#13#10'Остальное');loadfuncs;
+  write(load[1]);  loadbots('bot.ini');
+  write(load[2]);  loadwalls;
+  write(load[3]);  loadbombs;
+  write(load[4]);  loadbullets;
+  write(load[5]);  loadweapons;
+  write(load[6]);  loaditems;
+  write(load[7]);  loadmonsters;
+  write(load[8]);  loadfuncs;
   level.loadini;
   wb.load('stbf_',10,1); rb.load('stcfn',5,2);
   skull1:=loadbmp('skull1'); skull2:=loadbmp('skull2');
@@ -3592,8 +3601,8 @@ begin
   repeat
     rtimer.easymove;time.move;  mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
     case res of
-     0: add:=1;
-     1: add:=7;
+     0,1: add:=1;
+     2: add:=7;
     end;
     lastx:=mx-getmaxx div 2+add;
     lasty:=my-getmaxy div 2;
@@ -3603,23 +3612,42 @@ begin
     end;
 
    if player[mousepl].bot=0 then
+   with player[mousepl] do
    begin
-    player[mousepl].key[kright]:=lastx>0;
-    player[mousepl].key[kleft]:=lastx<0;
-    player[mousepl].key[kdown]:=lasty>0;
-    player[mousepl].key[kjump]:=lasty<-36;
-    player[mousepl].key[katack]:=push;
-    player[mousepl].key[knext]:=push2;
+     key[kright]:=lastx>0;
+     key[kleft]:=lastx<0;
+     key[kdown]:=lasty>0;
+     key[kjump]:=lasty<-36;
+     key[katack]:=push;
+     key[knext]:=push2;
    end;
     {Manual}
     while keypressed do
     begin
-      if length(keybuf)=255 then
-        keybuf:=copy(keybuf,2,254);
+      if length(keybuf)=255 then keybuf:=copy(keybuf,2,254);
       keybuf:=keybuf+downcase(readkey);
-      if not reswap then
+
+     if pos('debug',keybuf)>0 then begin debug:=not debug;  keybuf:='';end;
+     if pos('lev',keybuf)>0 then
+         begin
+           j:=pos('lev',keybuf)+3;
+           lev:=copy(keybuf,j,length(keybuf));
+           if pos('lev',lev)>0 then
+             keybuf:=copy(keybuf,j,length(keybuf));
+          with level do
+           for i:=1 to max do
+            if lev=downcase(name[i]) then begin cur:=i-1; j:=0; break; end;
+          if j=0 then
+          begin
+           for i:=1 to maxpl do
+              player[i].win:=true;
+            keybuf:='';
+          end;
+        end;
+
+{      if not reswap then
         if not death then
-      begin
+      begin}
        if pos('god',keybuf)>0 then
          begin
            for i:=1 to maxpl do
@@ -3648,24 +3676,7 @@ begin
            keybuf:='';
         end;
       end;
-       if pos('debug',keybuf)>0 then begin debug:=not debug;  keybuf:='';end;
-       if pos('lev',keybuf)>0 then
-         begin
-           j:=pos('lev',keybuf)+3;
-           lev:=copy(keybuf,j,length(keybuf));
-           if pos('lev',lev)>0 then
-             keybuf:=copy(keybuf,j,length(keybuf));
-          with level do
-           for i:=1 to max do
-            if lev=downcase(name[i]) then begin cur:=i-1; j:=0; break; end;
-          if j=0 then
-          begin
-           for i:=1 to maxpl do
-              player[i].win:=true;
-            keybuf:='';
-          end;
-        end;
-      end;
+{      end;}
     for i:=1 to maxpl do player[i].move;
     {Move}
     map.move;
@@ -3686,14 +3697,8 @@ begin
     rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
     if editor then p^[cur].sprite(mx,my);
 
-{    rb.print(30,10,st(byte(1 in map.m^[player[1].hero].w)));}
-{  digit(10,100,mx,' ');
-  digit(10,120,lastx,' ');
-  digit(100,100,my,' ');
-  digit(100,120,lasty,' ');}
-
     screen;
-    speed:=1;
+{    speed:=1;}
     if time.fps<>0 then speed:=mfps/time.fps;
     if speed>5 then speed:=5;
     if (not editor)and sfps then
