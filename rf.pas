@@ -891,10 +891,8 @@ begin
 end;
 procedure tplayer.draw;
 begin
-  if not drowed then exit;
   if not editor then
   begin
-    box(x1,y1,x2,y2);
     god:=map.m^[hero].god<>0;
     weap:=map.m^[hero].weap;
     health:=map.m^[hero].health;
@@ -903,6 +901,8 @@ begin
     tip:=map.m^[hero].tip;
     maxhealth:=monster[tip].health;
     ammo:=map.m^[hero].bul[weapon[weap].bul];
+    if not drowed then exit;
+    box(x1,y1,x2,y2);
     map.setdelta(round(map.m^[hero].x),round(map.m^[hero].y-14),(x2-x1) div 2,(y2-y1) div 2);
   end;
   map.draw;
@@ -1038,11 +1038,11 @@ begin
         if not((health*2>=monster[map.m^[hero].tip].health)and(it[map.item^[j].tip].megahealth>0))then
          n^[i].c:=n^[i].c or cimp;
    end;
-  if (ge=-1)and death then
+  if death then
    for i:=1 to maxpl do
     if player[i].hero<>hero then
     begin
-     ge:=map.getnode(player[i].mx,player[i].my);
+     if ge=-1 then ge:=map.getnode(player[i].mx,player[i].my);
      map.n^[ge].c:=map.n^[ge].c or cimp;
 {     break;}
     end;
@@ -3226,7 +3226,8 @@ begin
   while not eof(f) do
   begin
     readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
+    if (s[1]=';')or(s='')or(s[1]='/')or
+    ((pos('=',s)=0)and(s[1]<>'['))then continue;
     if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
     i:=pos('=',s);
     if i>0 then
@@ -3306,28 +3307,40 @@ begin
 end;
 procedure botmenu;
 const
-  max=9;
-  c:array[1..max] of record
-     name,bot:string[32];
-     end=
-  (
+  max=32;
+var
+  c:array[1..max] of string[32];
+{  (
+  (name:'Бот x Игрок';     bot:'bot1x1'),
   (name:'2 Игрока';        bot:'bot2x0'),
   (name:'3 Игрока';        bot:'bot3x0'),
   (name:'4 Игрока';        bot:'bot4x0'),
-  (name:'Бот 2 Игрока';    bot:'bot2x1'),
-  (name:'2 Бота 2 Игрока'; bot:'bot2x2'),
-  (name:'Бот 1 игрок';     bot:'bot1x1'),
-  (name:'2 Бота 1 игрок';  bot:'bot1x2'),
-  (name:'3 Бота 1 игрок';  bot:'bot1x3'),
+  (name:'Бот x 2 Игрока';    bot:'bot2x1'),
+  (name:'2 Бота x 2 Игрока'; bot:'bot2x2'),
+  (name:'2 Бота x 1 игрок';  bot:'bot1x2'),
+  (name:'3 Бота x 1 игрок';  bot:'bot1x3'),
   (name:'4 Бота';          bot:'bot0x4')
-  );
-var s:integer;
+  );}
+var
+  s:integer;
+  g:searchrec;
+  f:text;
 begin
-  for s:=1 to max do
-    men[s]:=c[s].name;
-  s:=menu(max);
+  findfirst('bot*.ini',anyfile,g);
+  s:=0;
+  while doserror=0 do
+  begin
+    inc(s);
+    c[s]:=g.name;
+    assign(f,g.name);
+    reset(f);
+    readln(f,men[s]);
+    close(f);
+    findnext(g);
+  end;
+  s:=menu(s);
   if s<>0 then
-   loadbots(c[s].bot+'.ini');
+   loadbots(c[s]);
 end;
 function skillmenu:integer;
 var s:integer;
