@@ -2,13 +2,11 @@
 { $A+,B+,D+,E-,F+,G+,I+,L+,N+,O+,P+,Q+,R+,S+,T+,V+,X+,Y+ Debug}
 {$M $fff0,0,655360}
 program RF; {First verion: 27.2.2001}
-uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx,grx;
+uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx,grx,rfunit;
 {$ifndef dpmi} Real mode not supported {$endif}
 const
   accel:integer=-1;
-  ppm=14; {pixel per meter (from plays.bmp)}
-  ms=ppm/30; { meter/sec}
-  ms2=ms/30; { meter/sec2}
+  levelini='level.ini';
   botdir='bots\';
   wadfile='513.wad';
   levext='.lev';
@@ -25,38 +23,39 @@ const
   maxpmaxx=300;
   maxpmaxy=300;
   cwall = 1 shl 0;  cstand= 1 shl 1;  cwater= 1 shl 2;  clava = 1 shl 3; cshl= 1 shl 4; cshr= 1 shl 5;
-     cFunc= 1 shl 6;
+     cFunc= 1 shl 6; cDeath=1 shl 7;
   cjump = 1 shl 0;
   cimp = 1 shl 1; cgoal = 1 shl 0;
   maxmon=196;
   maxitem=128;
-  maxf=32;  maxpix=512;  maxpul=512;  maxexpl=32;  maxmontip=32;
-  maxweapon=32;  maxbomb=16;  maxnode=300;
   maxlink=3; {0..3  (4)}
-  maxbul=16;
-  maxit=96;
-  maxfname=16;
   scry:integer=19*8;  scrx:integer=260;
   maxt=1600 div 8;
-  maxedmenu=12;       maxmust=128;
+  maxedmenu=12;
   defx=200; defy=200; defname='';
-  maxmonframe=10;
   maxkey=7;
   {esc Left Right Fire Jump}
   ckey:array[1..3,1..maxkey]of byte=(
-  (1,$4b,$4d,$1d,72,54,80),
-  (1,30,32,15,17,16,31),
-  (1,79,81,28,76,78,80));
+  (75,77,72,80,29,28,54),
+  (30,32,17,32,15,2,41),
+  (79,81,76,82,78,74,55));
+  kleft =1;
+  kright=2;
+  kjump =3;
+  kdown =4;
+  katack=5;
+  knext =6;
+  kprev =7;
   scroolspeed=12;
   truptime=30;
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
-  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  'Function',  '' );
+  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<<',  '>>',  'Function',  'Only in Deathmatch' );
 {  ednodestr:array[1..4]of string[16]=
   ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
   edmenustr:array[1..maxedmenu]of string[16]=
-  (  'Выход',  'Сохран',  'Загруз',  'Новая',  'Текстур',  'Стены',
+  (  'Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
    'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)'  );
 type
   real=single;
@@ -83,22 +82,8 @@ const
   blood:tcolor=(m:180; r:12; del: 6{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
   blow:tcolor=(m:160; r:8; del:2);
-  kexit=1;
-  kleft=2;
-  kright=3;
-  katack=4;
-  kjump=5;
-  knext=6;
-  kdown=7;
 type
-   tdest=(left,right);
 {   tnpat=0..maxpat;}
-   tmaxmontip=0..maxmontip;
-   tmaxweapon=0..maxweapon;
-   tmaxbomb=0..maxbomb;
-   tmaxbul=0..maxbul;
-   tmaxnode=0..maxnode;
-   tmaxit=0..maxit;
    tbitmap=record
      caption:array[1..2]of char; {'BM'}
      Size  : longint;   {X*Y+FMT+PAL}
@@ -134,6 +119,7 @@ type
     procedure draw(ax,ay:integer);
     procedure done;   virtual;
     function inwall(c:byte):boolean; virtual;
+    procedure checkdeath;
   end;
   tnode=object(tobj)
     c: byte;
@@ -188,6 +174,7 @@ type
      function getftr:real; virtual;
      function getupr:real; virtual;
      procedure takenext;
+     procedure takeprev;
      procedure draw(ax,ay:integer);
      procedure runleft;
      procedure runright;
@@ -347,84 +334,18 @@ type
   end;
   tlevel=object
     max,cur:integer;
-    name:array[0..30]of string[8];
+    name:array[0..40]of string[8];
     savefirst:string[8];
     procedure loadini;
     procedure load;
     procedure loadfirst;
     procedure next;
+    procedure add(a:string);
   end;
 (******************************** Variables *********************************)
 var
   pkey:array[byte]of boolean;
   keybuf:string;
-  must:array[0..maxmust]of
-  record
-    tip: integer;
-    x,y,curtip: integer;
-    dest: tdest;
-    delay: longint;
-  end;
-  it:array[tmaxit]of
-  record
-    name:string[40];
-    vis:string[8];
-    skin:array[0..maxmonframe]of tnpat;
-    weapon,ammo,count,max:longint;
-    health,armor,megahealth,god:real;
-    speed:real;
-    cant:boolean;
-  end;
-  bul:array[tmaxbul]of
-  record
-    name:string[40];
-    vis:string[8];
-    maxfly,delfly,shot:byte;
-    fly:array[0..maxmonframe]of tnpat;
-    hit,fire,mg,prise,rotate,g,per: real;
-    bomb: tmaxbomb;
-  end;
-  bomb:array[tmaxbomb]of
-  record
-    name:string[40];
-    vis:string[8];
-    rad,maxfire: longint;
-    time,hit,fired: real;
-    fire:array[0..maxmonframe]of tnpat;
-  end;
-  weapon:array[tmaxweapon]of
-  record
-    name:string[40];
-    vis:string[8];
-    skin: tnpat;
-    bul,pul: tmaxbul;
-    mg,prise:real;
-    shot,hit,reload,speed,per,damages,bomb:real; {shot time}
-    slot,reloadslot,cool:longint;
-    sniper:boolean;
-  end;
-  monster:array[tmaxmontip]of
-  record
-    name:string[40];
-    x,y:integer;
-    dest:tdest;
-    health,armor,h:longint;
-    defitem: tmaxweapon; {?}
-    stay:boolean;
-    speed,jumpx,jumpy,acsel,brakes:real;
-    vis:string[8];
-    stand,damage,fire:array[tdest]of tnpat;
-    run,die,bomb:array[0..maxmonframe-1,tdest]of tnpat;
-    runi,damagei,diei,bombi:record
-       max:longint; delay:real;
-    end;
-  end;
-  fname:array[0..maxfname]of record
-    name:string[16];
-    vis:string[8];
-    skin: tnpat;
-    n: integer;
-  end;
   en:array[1..7]of tnpat;
   pnode,pnodei,pnodeg: tnpat;
   time,rtimer:ttimer;
@@ -446,6 +367,20 @@ var
   level:tlevel;
   heiskin: array[tdest]of tnpat;
 (******************************** IMPLEMENTATION ****************************)
+procedure tlevel.add(a:string);
+var
+  i: integer;
+  f: text;
+begin
+  for i:=1 to max do
+    if upcase(name[i])=upcase(a)then exit;
+  inc(max);
+  name[max]:=a;
+  assign(f,levelini);
+  append(f);
+  writeln(f,a);
+  close(f);
+end;
 procedure drawintro;
 var t:tnpat;
 begin
@@ -619,6 +554,13 @@ begin
   map.done;
   map.load(name[cur]);
 
+  if not death then with map do begin
+    for i:=0 to maxmon do
+      if (m^[i].enable)and(m^[i].ai) then m^[i].checkdeath;
+    for i:=0 to maxitem do
+      if item^[i].enable then item^[i].checkdeath;
+  end;
+
  if not first then
   for i:=1 to maxpl do
   with map.m^[player[i].hero] do
@@ -652,7 +594,7 @@ procedure tlevel.loadini;
 var f:text;
 begin
   cur:=0; max:=0;
-  assign(f,'level.ini');
+  assign(f,levelini);
   reset(f);
   repeat
     inc(max);
@@ -685,9 +627,9 @@ begin
 end;
 procedure titem.done;
 begin
- if death and first then
-   initmust(2,startx,starty,tip,right,reswaptime);
- tobj.done;
+  if death and first then
+    initmust(2,startx,starty,tip,right,reswaptime);
+  tobj.done;
 end;
 procedure tplayer.initmulti;
 var i,max,cur,w:integer;
@@ -923,9 +865,19 @@ begin
   if delay>0 then exit;
   repeat
     inc(weap);
-  until (weap>maxweapon)or((bul[weapon[weap].bul]>0)and(weap in w));
+    if weap>maxweapon then weap:=1;
+  until (weap>maxweapon)or(((bul[weapon[weap].bul]>0)or(weapon[weap].hit>0))and(weap in w));
 {    or((weapon[weap].hit>0)and(weap in w));}
-  if weap>maxweapon then weap:=1;
+  delay:=round(mfps/speed*0.25);
+end;
+procedure tmon.takeprev;
+begin
+  if delay>0 then exit;
+  repeat
+    dec(weap);
+    if weap<0 then weap:=maxweapon;
+  until (weap<0)or(((bul[weapon[weap].bul]>0)or(weapon[weap].hit>0))and(weap in w));;
+{    or((weapon[weap].hit>0)and(weap in w));}
   delay:=round(mfps/speed*0.25);
 end;
 function tmap.getnode(mx,my:longint):integer;
@@ -1110,16 +1062,17 @@ begin
 
    end;
   map.m^[hero].key:=[];
-  if key[1] then endgame:=true;
+{  if key[1] then endgame:=true;}
   case bot of
   0:
    begin
-     if key[2] then include(map.m^[hero].key,kleft);
-     if key[3] then include(map.m^[hero].key,kright);
-     if key[4] then include(map.m^[hero].key,katack);
-     if key[5] then if not map.m^[hero].life then lose:=true else include(map.m^[hero].key,kjump);
-     if key[6] then include(map.m^[hero].key,knext);
-     if key[7] then include(map.m^[hero].key,kdown);
+     if key[kleft] then include(map.m^[hero].key,kleft);
+     if key[kright] then include(map.m^[hero].key,kright);
+     if key[katack] then include(map.m^[hero].key,katack);
+     if key[kjump] then if not map.m^[hero].life then lose:=true else include(map.m^[hero].key,kjump);
+     if key[knext] then include(map.m^[hero].key,knext);
+     if key[kprev] then include(map.m^[hero].key,kprev);
+     if key[kdown] then include(map.m^[hero].key,kdown);
    end;
  1:begin {SuperAI - bots}
     mx:=map.m^[hero].mx;   my:=map.m^[hero].my;
@@ -1243,7 +1196,7 @@ begin
   end;
   ry:=0;
   sp:=weapon[weap].speed*l;
-  per:=(rf.bul[weapon[weap].bul].per+weapon[weap].per)/100;
+  per:=(rfunit.bul[weapon[weap].bul].per+weapon[weap].per)/100;
   if ai and sniper then
   begin
     d:=sqrt(sqr(target.x-x)+sqr(target.y-y));
@@ -1251,7 +1204,7 @@ begin
 {    if ty>abs(target.x-x)/d*}
     ry:=ty*sp;
   end;
- for i:=1 to rf.bul[weapon[weap].bul].shot do
+ for i:=1 to rfunit.bul[weapon[weap].bul].shot do
   map.initbul(x,y-monster[tip].h,
   sp*(1+random*per-per/2)+dx,
   sp*(random*per-per/2)+ry
@@ -1494,6 +1447,7 @@ begin
   if katack in key then atack;
   if kjump in key then jump;
   if knext in key then takenext;
+  if kprev in key then takeprev;
   if kdown in key then begin down:=true; if inwall(cwater) then dy:=dy+monster[tip].jumpy*0.25; end
     else down:=false;
   tobj.move;
@@ -2142,19 +2096,6 @@ begin
       if freex>=getmaxx then begin dec(maxtt); break; end;
    end;
 end;
-function loadbmpr(s:string):tnpat;
-var i:longint;
-begin
-  s:=upcase(s);
-  for i:=1 to maxpat do
-    if p^[i].x=0 then
-    begin
-     if p^[i].loadr(dbmp+s+'.bmp') then
-       loadbmpr:=i else loadbmpr:=0;
-     exit;
-    end;
-  loadbmpr:=0;
-end;
 function tmap.initf(ax,ay,asx,asy,atip:integer):integer;
 var i:longint;
 begin
@@ -2431,10 +2372,17 @@ begin
   down:=false;
   x:=ax; y:=ay;
   mx:=round(x); my:=round(y);
+  lx:=mx div 8;
+  ly:=my div 8;
   dx:=adx; dy:=ady;
   startx:=mx;
   starty:=my;
   first:=af;
+end;
+procedure tObj.checkdeath;
+begin
+  if inwall(cDeath) then
+    tObj.done;
 end;
 procedure tpix.init;
 begin
@@ -2660,6 +2608,7 @@ var
     x,y,sx,sy,tip:integer;
   end;
 begin
+  level.add(name);
   assign(ff,name+levext);
   rewrite(ff,1);
   blockwrite(ff,origlev,sizeof(origlev));
@@ -2774,6 +2723,7 @@ begin
   if a and cshl>0 then getcol:=grey;
   if a and cshr>0 then getcol:=dark;
   if a and cFunc>0 then getcol:=blue;
+  if a and cDeath>0 then getcol:=red;
 end;
 begin
   x1:=dx div 8;
@@ -2939,290 +2889,6 @@ begin
   maxallwall:=k;
   close(dat);
 end;
-procedure loadmonsters;
-var
-  f:text;
-  s,s1,s2:string;
-  nm,i,j:longint;
-begin
-  fillchar(monster,sizeof(monster),0);
-  assign(f,'monster.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
-    if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
-    i:=pos('=',s);
-    if i>0 then
-    with monster[nm] do
-    begin
-      s1:=downcase(copy(s,1,i-1));
-      s2:=copy(s,i+1,length(s)-i);
-      if s1='name' then name:=s2;
-      if s1='h' then h:=vl(s2);
-      if s1='firstitem' then defitem:=vl(s2);
-      if s1='sizex' then x:=vl(s2);
-      if s1='sizey' then y:=vl(s2);
-      if s1='health' then health:=vl(s2);
-      if s1='armor' then armor:=vl(s2);
-      if s1='stay' then stay:=boolean(downcase(s2)='yes');
-      if s1='speed' then speed:=vlr(s2);
-      if s1='acsel' then acsel:=vlr(s2);
-      if s1='brakes' then brakes:=vlr(s2);
-      if s1='jumpx' then jumpx:=vlr(s2);
-      if s1='jumpy' then jumpy:=vlr(s2);
-      if s1='vis' then vis:=s2;
-      if s1='run' then runi.delay:=vlr(s2);
-      if s1='die' then diei.delay:=vlr(s2);
-      if s1='bomb' then bombi.delay:=vlr(s2);
-    end;
-  end;
-  close(f);
-  for i:=1 to maxmontip do
-  with monster[i] do
-   if name<>'' then
-   begin
-     stand[left]:=loadbmp(vis+'s');
-     stand[right]:=loadbmpr(vis+'s');
-     damage[left]:=loadbmp(vis+'d');
-     damage[right]:=loadbmpr(vis+'d');
-     fire[left]:=loadbmp(vis+'f1');
-     fire[right]:=loadbmpr(vis+'f1');
-     for j:=1 to maxmonframe do
-      if exist(vis+'r'+st(j))then
-      begin
-        run[j,left]:=loadbmp(vis+'r'+st(j));
-        run[j,right]:=loadbmpr(vis+'r'+st(j));
-        runi.max:=j;
-      end;
-     for j:=1 to maxmonframe do
-      if exist(vis+'d'+st(j))then
-      begin
-        die[j,left]:=loadbmp(vis+'d'+st(j));
-        die[j,right]:=loadbmpr(vis+'d'+st(j));
-        diei.max:=j;
-      end;
-     for j:=1 to maxmonframe do
-      if exist(vis+'b'+st(j))then
-      begin
-        bomb[j,left]:=loadbmp(vis+'b'+st(j));
-        bomb[j,right]:=loadbmpr(vis+'b'+st(j));
-        bombi.max:=j;
-      end;
-      if bombi.max=0 then
-      begin
-        bombi:=diei;
-        bomb:=die;
-      end;
-   end;
-end;
-procedure loadweapons;
-var
-  f:text;
-  s,s1,s2:string;
-  nm,i,j:longint;
-begin
-  fillchar(weapon,sizeof(weapon),0);
-  assign(f,'weapon.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
-    if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
-    i:=pos('=',s);
-    if i>0 then
-    with weapon[nm] do
-    begin
-      s1:=downcase(copy(s,1,i-1));
-      s2:=copy(s,i+1,length(s)-i);
-      if s1='name' then name:=s2;
-      if s1='cool' then cool:=vl(s2);
-      if s1='bul' then bul:=vl(s2);
-      if s1='pul' then pul:=vl(s2);
-      if s1='vis' then vis:=s2;
-      if s1='mg' then mg:=vlr(s2);
-      if s1='prise' then prise:=vlr(s2);
-      if s1='hit' then hit:=vlr(s2);
-      if s1='shot' then shot:=vlr(s2);
-      if s1='reload' then reload:=vlr(s2);
-      if s1='speed' then speed:=vlr(s2);
-      if s1='slot' then slot:=vl(s2);
-      if s1='%' then per:=vlr(s2);
-      if s1='realodslot' then reloadslot:=vl(s2);
-      if s1='sniper' then sniper:=boolean(downcase(s2)='on');
-    end;
-  end;
-  close(f);
-  for i:=0 to maxweapon do
-   with weapon[i] do
-   if name<>'' then
-   begin
-     skin:=loadbmp(vis);
-     damages:=0; bomb:=0;
-     if hit>0 then damages:=damages+hit/shot;
-     damages:=damages+rf.bul[pul].shot*rf.bul[pul].hit/shot;
-     damages:=damages+rf.bomb[rf.bul[pul].bomb].hit/shot;
-     if rf.bul[bul].bomb>0 then bomb:=rf.bomb[rf.bul[pul].bomb].hit;
-   end;
-end;
-procedure loadbombs;
-var
-  f:text;
-  s,s1,s2:string;
-  nm,i,j:longint;
-begin
-  fillchar(bomb,sizeof(bomb),0);
-  assign(f,'bomb.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
-    if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
-    i:=pos('=',s);
-    if i>0 then
-    with bomb[nm] do
-    begin
-      s1:=downcase(copy(s,1,i-1));
-      s2:=copy(s,i+1,length(s)-i);
-      if s1='name' then name:=s2;
-      if s1='rad' then rad:=round(vlr(s2)*ppm);
-      if s1='time' then time:=vlr(s2);
-      if s1='vis' then vis:=s2;
-      if s1='hit' then hit:=vlr(s2);
-      if s1='fire' then fired:=vlr(s2);
-    end;
-  end;
-  close(f);
-  for i:=1 to maxbomb do
-   with bomb[i] do if name<>'' then
-     for j:=1 to maxmonframe do
-      if (exist(vis+st(j)))and(length(vis+st(j))<=8)then
-      begin
-        fire[j]:=loadbmp(vis+st(j));
-        maxfire:=j;
-      end;
-end;
-procedure loadbullets;
-var
-  f:text;
-  s,s1,s2:string;
-  nm,i,j:longint;
-begin
-  fillchar(bul,sizeof(bul),0);
-  assign(f,'bullet.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
-    if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
-    i:=pos('=',s);
-    if i>0 then
-    with bul[nm] do
-    begin
-      s1:=downcase(copy(s,1,i-1));
-      s2:=copy(s,i+1,length(s)-i);
-      if s1='name' then name:=s2;
-      if s1='vis' then vis:=s2;
-      if s1='prise' then prise:=vlr(s2);
-      if s1='mg' then mg:=vlr(s2);
-      if s1='g' then g:=vlr(s2)*ms2;
-      if s1='hit' then hit:=vlr(s2);
-      if s1='fire' then fire:=vlr(s2);
-      if s1='bomb' then bomb:=vl(s2);
-      if s1='fly' then delfly:=vl(s2);
-      if s1='rotate' then rotate:=vlr(s2);
-      if s1='%' then per:=vlr(s2);
-      if s1='shot' then shot:=vl(s2);
-    end;
-  end;
-  close(f);
-  for i:=1 to maxbul do
-   with bul[i] do if name<>'' then
-   begin
-      if exist(vis)then
-      begin
-        fly[1]:=loadbmp(vis);
-        maxfly:=1;
-      end
-      else
-     for j:=1 to maxmonframe do
-      if exist(vis+st(j))then
-      begin
-        fly[j]:=loadbmp(vis+st(j));
-        maxfly:=j;
-      end;
-   end;
-end;
-procedure loaditems;
-var
-  f:text;
-  s,s1,s2:string;
-  nm,i,j:longint;
-begin
-  fillchar(it,sizeof(it),0);
-  assign(f,'item.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,s);
-    if (s[1]=';')or(s='')or(s[1]='/')then continue;
-    if s[1]='[' then begin nm:=vl(copy(s,2,length(s)-2)); continue; end;
-    i:=pos('=',s);
-    if i>0 then
-    with it[nm] do
-    begin
-      s1:=downcase(copy(s,1,i-1));
-      s2:=copy(s,i+1,length(s)-i);
-      if s1='name' then name:=s2;
-      if s1='vis' then vis:=s2;
-      if s1='speed' then speed:=vlr(s2)*ms;
-      if s1='weapon' then weapon:=vl(s2);
-      if s1='ammo' then ammo:=vl(s2);
-      if s1='count' then count:=vl(s2);
-      if s1='health' then health:=vlr(s2);
-      if s1='megahealth' then megahealth:=vlr(s2);
-      if s1='armor' then armor:=vlr(s2);
-      if s1='god' then god:=vlr(s2);
-      if s1='cant' then cant:=boolean(downcase(s2)='true');
-    end;
-  end;
-  close(f);
-  for i:=1 to maxit do
-   with it[i] do if name<>'' then
-     if exist(vis)then
-     begin
-        skin[1]:=loadbmp(vis); max:=1;
-     end
-       else
-     for j:=1 to maxmonframe do
-      if exist(vis+st(j))then
-      begin
-        skin[j]:=loadbmp(vis+st(j));
-        max:=j;
-      end;
-end;
-procedure loadfuncs;
-var
-  f:text;
-  i,cur:integer;
-begin
-  cur:=0;
-  assign(f,'func.ini');
-  reset(f);
-  while not eof(f) do
-  begin
-    readln(f,fname[cur].n);
-    readln(f,fname[cur].name);
-    readln(f,fname[cur].vis);
-    fname[cur].skin:=loadbmp(fname[cur].vis);
-    inc(cur);
-  end;
-  close(f);
-end;
 var
   men:array[0..100]of string[40];
 procedure loadbots(name:string);
@@ -3293,6 +2959,7 @@ begin
   screen;
 end;
 begin
+  while keypressed do readkey;
   maxl:=10;
   for i:=1 to max do
     if length(men[i])>maxl then maxl:=length(men[i]);
@@ -3347,7 +3014,7 @@ begin
   begin
     inc(s);
     c[s]:=g.name;
-    assign(f,g.name);
+    assign(f,botdir+g.name);
     reset(f);
     readln(f,men[s]);
     close(f);
@@ -3497,17 +3164,18 @@ var
 begin
 {Main Loading}
   w.load(wadfile);
-  p^[0].load('bmp\error.bmp');
   loadres;
-  write(load[1]);  loadbots('bot.ini');
-  write(load[2]);  loadwalls;
-  write(load[3]);  loadbombs;
-  write(load[4]);  loadbullets;
-  write(load[5]);  loadweapons;
-  write(load[6]);  loaditems;
-  write(load[7]);  loadmonsters;
-  write(load[8]);  loadfuncs;
+  writeln(load[1]);  loadbots(botdir+'bot.ini');
+  writeln(load[2]);  loadwalls;
+  writeln(load[3]);  loadbombs;
+  writeln(load[4]);  loadbullets;
+  writeln(load[5]);  loadweapons;
+  writeln(load[6]);  loaditems;
+  writeln(load[7]);  loadmonsters;
+  writeln(load[8]);  loadfuncs;
+
   level.loadini;
+
   wb.load('stbf_',10,1); rb.load('stcfn',5,2);
   skull1:=loadbmp('skull1'); skull2:=loadbmp('skull2');
   intro:=loadbmp('intro');
@@ -3517,7 +3185,7 @@ begin
   cur:=loadbmp('cursor'); for i:=1 to 7 do en[i]:=loadbmp('puh'+st(i));
   heiskin[left]:=loadbmp('hai');  heiskin[right]:=loadbmpr('hai');
 {Init Screen...}
-  writeln('Free RAM: ',memavail);
+
   initgraph(res); loadfont('8x8.fnt'); clear; mfps:=30; loadpal('playpal.bmp');
   if accel<>-1 then setaccelerationmode(accel);
 {Load first level}
@@ -3542,11 +3210,7 @@ begin
   end;
 
 
-  if not editor then
-  begin
-{    level.loadfirst;}
-    level.next;
-  end;
+   if not editor then level.next;
 
   {Start game}
   keybuf:='';
@@ -3577,6 +3241,10 @@ begin
     begin
       setMouseCursor(getmaxx div 2,getmaxy div 2);
     end;
+
+   for j:=1 to min(3,maxpl) do
+     for i:=1 to maxkey do
+       player[j].key[i]:=pkey[ckey[j,i]];
 
    if player[mousepl].bot=0 then
    with player[mousepl] do
@@ -3647,6 +3315,7 @@ begin
     for i:=1 to maxpl do player[i].move;
     {Move}
     map.move;
+    endgame:=endgame or pkey[1];
     if not multi then
       endgame:=endgame or player[1].lose or player[1].win
      else
