@@ -2,17 +2,18 @@
 { $A+,B+,D+,E-,F+,G+,I+,L+,N+,O+,P+,Q+,R+,S+,T+,V+,X+,Y+ Debug}
 {$M $fff0,0,655360}
 program RF; {First verion: 27.2.2001}
-uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx;
+uses crt,mycrt,api,mouse,wads,F32MA,dos,graphics,grafx;
 {$ifndef dpmi} Real mode not supported {$endif}
 const
-  res=1;
+  res:integer=0;
+  accel:integer=-1;
   ppm=14; {pixel per meter (from plays.bmp)}
   ms=ppm/30; { meter/sec}
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.1.4';
-  data='31.3.2001';
+  version='0.1.6';
+  data='2.4.2001';
   company='IVA vision <-=[■]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
   levels='Pavel Burakov [ICE]';
@@ -23,7 +24,7 @@ const
   cstand= 1 shl 1;
   cwater= 1 shl 2;
   clava = 1 shl 3;
-  maxmon=64;
+  maxmon=96;
   maxitem=128;
   maxf=32;
   maxpix=1024;
@@ -751,7 +752,7 @@ begin
       then case f^[i].tip of
         10: win:=true;
         11: lose:=true;
-        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,99,0);
+        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0);
       end;
 
    end;
@@ -824,8 +825,9 @@ begin
 end;
 function tmon.takeweap(n:tmaxweapon):boolean;
 begin
+  if (weapon[n].cool>=weapon[weap].cool)and not(n in w) then weap:=n;
+  if weap=0 then weap:=n;
   include(w,n);
-  if weapon[n].cool>weapon[weap].cool then weap:=n;
   {error mg}
   takeweap:=true;
 end;
@@ -929,6 +931,7 @@ begin
     begin
       map.m^[i].damage(mx,my,bul[tip].hit,0,0);
       detonate;
+      exit;
     end;
   end;
 end;
@@ -974,7 +977,7 @@ begin
   state:=as;
   savedel:=round(ad*mfps/speed);
 end;
-procedure tmon.setcurstate;
+procedure tmon.setcurstate(as:tstate; ad: real);
 begin
   if not life then exit;
   curstate:=as;
@@ -1000,14 +1003,14 @@ end;
 procedure tmon.kill;
 begin
   if not life then exit;
-  setcurstate(die,100);
+  setcurstate(die,monster[tip].diei.delay);
   giveweapon;
   life:=false;
 end;
 procedure tmon.explode;
 begin
   if not life then exit;
-  setcurstate(crash,100);
+  setcurstate(crash,monster[tip].bombi.delay);
   giveweapon;
   life:=false;
 end;
@@ -1026,7 +1029,7 @@ begin
   end;
   if health<0 then health:=0;
   setstate(hack,0.1);
-  for i:=0 to round((hit+bomb+oxy)*15) do
+  for i:=0 to min(256,round((hit+bomb+oxy)*15)) do
     map.randompix(ax,ay,dx,dy,5,5,blood);
   if health<=0 then
     if bomb>0 then explode
@@ -1103,13 +1106,13 @@ begin
   begin
      state:=crash;
      inc(statedel);
-     vis:=min(round(statedel/(mfps*monster[tip].bombi.delay))+1,monster[tip].bombi.max);
+     vis:=min(round(statedel/(mfps*monster[tip].bombi.delay/speed/monster[tip].bombi.max))+1,monster[tip].bombi.max);
   end;
   die:
   begin
      state:=die;
      inc(statedel);
-     vis:=min(round(statedel/(mfps*monster[tip].diei.delay))+1,monster[tip].diei.max);
+     vis:=min(round(statedel/(mfps*monster[tip].diei.delay/speed/monster[tip].diei.max))+1,monster[tip].diei.max);
   end;
   else if savedel>0 then begin dec(savedel); end;
   end;
@@ -1237,7 +1240,7 @@ begin
    func:
    with fun do
    begin
-     for i:=0 to 320 div ddd-1 do
+     for i:=0 to getmaxx div ddd-1 do
      begin
        if shift+i=cur then bar(i*ddd,scry+12,(i+1)*ddd-1,getmaxx,white);
        print(i*ddd,scry+2,not white,fname[shift+i].name);
@@ -1247,7 +1250,7 @@ begin
    mons:
    with mon do
    begin
-     for i:=0 to 320 div ddd-1 do
+     for i:=0 to getmaxx div ddd-1 do
      begin
        if shift+i=cur then bar(i*ddd,scry+12,(i+1)*ddd-1,getmaxx,white);
        print(i*ddd,scry+2,not white,monster[shift+i].name);
@@ -1257,7 +1260,7 @@ begin
    items:
    with itm do
    begin
-     for i:=0 to 320 div ddd-1 do
+     for i:=0 to getmaxx div ddd-1 do
      begin
        if shift+i=cur then bar(i*ddd,scry+12,(i+1)*ddd-1,getmaxx,white);
        print(i*ddd,scry+2,not white,it[shift+i].name);
@@ -1350,14 +1353,14 @@ begin
      end;
      face: with land do
       begin
-        if mx=getmaxx then
+        if mx>=(getmaxx-4) then
         begin
           inc(ch);
           t[1].b.done;
           for j:=1 to maxt-1 do t[j].b:=t[j+1].b;
         end
         else
-        if (mx=0)and(ch>0) then
+        if (mx<=4)and(ch>0) then
         begin
           dec(ch);
 {          t[maxt].b.done;
@@ -1372,22 +1375,22 @@ begin
       end;
      func: with fun do
       begin
-        if mx=getmaxx then inc(shift)  else
-        if (mx=0)and(shift>0) then dec(shift)
+        if mx>=(getmaxx-4) then inc(shift)  else
+        if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
        repeat until not mouse.push;
       end;
      mons: with mon do
       begin
-        if mx=getmaxx then inc(shift)  else
-        if (mx=0)and(shift>0) then dec(shift)
+        if mx>=(getmaxx-4) then inc(shift)  else
+        if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
        repeat until not mouse.push;
       end;
      items: with itm do
       begin
-        if mx=getmaxx then inc(shift)  else
-        if (mx=0)and(shift>0) then dec(shift)
+        if mx>=(getmaxx-4) then inc(shift)  else
+        if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
        repeat until not mouse.push;
       end;
@@ -1479,7 +1482,7 @@ begin
         x:=freex;
       maxtt:=i;
       freex:=freex+b.x+2;
-      if freex>=320 then begin dec(maxtt); break; end;
+      if freex>=getmaxx then begin dec(maxtt); break; end;
    end;
 end;
 function loadbmpr(s:string):tnpat;
@@ -1572,7 +1575,7 @@ var
   savex,savey:real;
   x1,y1,x2,y2,i,j:integer;
 begin
-  dy:=dy+map.g*speed;
+  dy:=dy+map.g;
   savex:=x;
   savey:=y;
   x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
@@ -1598,7 +1601,9 @@ begin
   for i:=x1 to x2 do
    if map.land[y2]^[i].land and cstand>0 then
    begin
-     dy:=-dy*getupr; y:=y-1;
+     dy:=-dy*getupr;
+{     if dy>0 then dy:=-dy*getupr;{ else dy:=dy-map.g*5;}
+     y:=y-1;
      break;
    end;
 end;
@@ -2089,8 +2094,8 @@ begin
   begin
     if (mo(0,0,0,scry))and(dx>0) then dec(dx,scroolspeed);
     if (my=0)and(dy>0) then dec(dy,scroolspeed);
-    if (mo(getmaxx,0,getmaxx,scry))and(dx div 8+25<x) then inc(dx,scroolspeed);
-    if (my=getmaxy)and(dy div 8+20<y) then inc(dy,scroolspeed);
+    if (mo(getmaxx-4,0,getmaxx,scry))and(dx div 8+25<x) then inc(dx,scroolspeed);
+    if (my>=(getmaxy-4))and(dy div 8+20<y) then inc(dy,scroolspeed);
   end;
 end;
 (*procedure tbmp.loadfile;
@@ -2257,7 +2262,11 @@ begin
         bomb[j,right]:=loadbmpr(vis+'b'+st(j));
         bombi.max:=j;
       end;
-      if bombi.max=0 then begin bombi:=diei; bomb:=die; end;
+      if bombi.max=0 then
+      begin
+        bombi:=diei;
+        bomb:=die;
+      end;
    end;
 end;
 procedure loadweapons;
@@ -2444,6 +2453,7 @@ begin
   writeln('Стрелять   : Ctrl    Tab');
   writeln('СледОружие : Enter   Q');
   writeln('Меню вниз  : Tab');
+  writeln('*** Если у вас проблемы с графикой - '#13#10'замените число в первой и во второй строчке в файле res.ini на 0');
 end;
 procedure loadfuncs;
 var
@@ -2542,7 +2552,7 @@ begin
 end;
 procedure gamemenu;
 var
-  ch,hod,enter:integer;
+  ch,hod,enter,sx,sy:integer;
 const
   x1=80;
   y1=60;
@@ -2555,15 +2565,17 @@ procedure draw;
 var i,j:integer;
 begin
   clear;
-  p^[intro].put(0,0);
+  p^[intro].put(sx,sy);
   for i:=1 to max do
-    wb.print(x1,y1+(i-1)*d,name[i]);
+    wb.print(sx+x1,sy+y1+(i-1)*d,name[i]);
   if hod mod 30<15 then j:=skull1 else j:=skull2;
-  p^[j].sprite(x1-30,y1-5+(ch-1)*d);
-  rb.print(5,192,game+' ['+version+']');
+  p^[j].sprite(sx+x1-30,sy+y1-5+(ch-1)*d);
+  rb.print(sx+5,sy+192,game+' ['+version+']');
   screen;
 end;
 begin
+  sx:=(getmaxx-320) div 2;
+  sy:=(getmaxy-200) div 2;
   endgame:=false;
   ch:=1;  hod:=0; enter:=0;
   repeat
@@ -2608,12 +2620,22 @@ begin
   clear;
   t:=loadbmp('start'+st(random(4)+1));
   p^[t].spritec(maxx div 2,maxy div 2);
-  rb.print(120,190,'В это время...');
+  rb.print(getmaxx div 2-40,getmaxy-10,'В это время...');
   p^[t].done;
   screen;
 {  delay(1000); error}
   while keypressed do readkey;
   readkey;
+end;
+procedure loadres;
+var f:text;
+begin
+  assign(f,'res.ini');
+{$i-}  reset(f); {$i+}
+if ioresult<>0 then exit;
+  readln(f,res);
+  readln(f,accel);
+  close(f);
 end;
 (******************************** PROGRAM ***********************************)
 var
@@ -2628,7 +2650,8 @@ begin
 {  sfps:=true;}
 {Main Loading}
   w.load(wadfile);
-  p^[0].load('-');
+  p^[0].load('bmp\error.bmp');
+  loadres;
   loadwalls;
   loadmonsters;
   loadweapons;
@@ -2648,8 +2671,10 @@ begin
   heiskin[right]:=loadbmpr('hai');
 {Init Screen...}
   initgraph(res); loadfont('8x8.fnt'); clear; mfps:=30; loadpal('playpal.bmp');
-  mousebox(0,0,getmaxx,getmaxy
-  );
+  if accel<>-1 then setaccelerationmode(accel);
+  ddx:=6; ddy:=6;
+  mousebox(0,0,getmaxx,getmaxy);
+  Sensetivity(12,12);
 {Load first level}
  map.new;
  map.g:=9.8*ms2;
