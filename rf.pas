@@ -472,7 +472,7 @@ begin
 end;
 function tmon.clever: boolean;
 begin
-  clever:=monster[tip].health>200;
+  clever:=(monster[tip].health>200)or(level.sniper);
 end;
 function tmon.onhead(ax,ay: integer):boolean;
 begin
@@ -1686,8 +1686,8 @@ begin
 end;
 
 var
-  i:integer;
   dest:tdest;
+
 function getgoal:integer;
 var
   i,j,ge,findn:integer;
@@ -1816,7 +1816,7 @@ end;
 
 
 var
-  j,ti,tj,k:longint;
+  i,j,ti,tj,k:longint;
 
 begin
   if (ammo<max(1,weapon[weap].input))and(weapon[weap].hit=0) then
@@ -2051,14 +2051,14 @@ begin
   per:=(rfunit.bul[weapon[nweap].bul].per+weapon[nweap].per)/100;
 
   d:=sqrt(sqr(target.x-getcx)+sqr(target.y-getcy));
-  if ai and level.sniper then
+  if ai and (clever) then
   begin
 //    ty:=-(target.y-getcy)/d;
 {    if ty>abs(target.x-x)/d*}
     ry:=(getcy-target.y)/d*(-l);
     rx:=abs(getcx-target.x)/d;
   end;
-  if ai and onhead(target.x, target.y) and (level.sniper or clever){and (abs(getcx-target.x)<getsx*8)} then
+  if ai and onhead(target.x, target.y) and clever{and (abs(getcx-target.x)<getsx*8)} then
   begin
     rx:=0;
     if target.y>getcy then ry:=1*l
@@ -2809,13 +2809,13 @@ begin
   ey:=target.y div 8;
   see:=true; first:=true;
 
-  if (abs(sy-ey)>5)and not level.sniper then see:=false;
+  if (abs(sy-ey)>5)and not clever then see:=false;
 
   tex:=0;  tey:=0;
-  if (ty>0)and(ty<map.y) and ((abs(sx-ex)>abs(ey-sy))or not level.sniper)and see then
+  if (ty>0)and(ty<map.y) and ((abs(sx-ex)>abs(ey-sy))or not clever)and see then
   repeat
     tex:=tex+l;
-    if level.sniper then
+    if clever then
      if abs(sx-ex)<>0 then
        tey:=round(abs(tex)/abs(sx-ex)*(ey-sy));
 
@@ -2886,7 +2886,7 @@ begin
 
   if (know){and(tar>0)} then
   begin
-    if level.sniper then
+    if clever then
     begin
      if (dest=left)and(target.x>self.getcx) then include(key,kright) else
      if (dest=right)and(target.x<self.getcx) then include(key,kleft);
@@ -2898,13 +2898,13 @@ begin
      end
      else
     if random(300 div settings.mondelay)=0 then include(key,kjump);
-    if (weap=1)or((fired>0)and(level.sniper)) then if target.x<self.getcx then include(key,kleft) else include(key,kright);
+    if (weap=1)or((fired>0)and(clever)) then if target.x<self.getcx then include(key,kleft) else include(key,kright);
   end;
   if see then begin include(key,katack); know:=true; end;
 
   if onhead(target.x,target.y) then begin
      know:=true;
-     if level.sniper or clever then begin
+     if clever then begin
        include(key,katack);
        if target.x+8<self.getcx then
        include(key,kleft) else
@@ -4633,7 +4633,7 @@ begin
          2: inititem(x,y,0,0,curtip,true);
         end;
         tip:=0;
-        initbomb(x,y-16,reswapbomb,0);
+        initbomb(x,y-16,reswapbomb,-1);
       end;
   end
   else
@@ -5208,6 +5208,7 @@ begin
   else
   levdir:=mainmod+'\Levels\';
 
+  maininidir:=mainmod+'.\';
   inidir:=runmod+'.\';
   savedir:=runmod+'\Saves\';
 
