@@ -12,15 +12,15 @@ const
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.2.0';
-  data='7.4.2001';
+  version='0.2.1';
+  data='8.4.2001';
   title='DOOM 513: Richtiger Faschist '+version+' ['+data+']';
   company='IVA vision <-=[þ]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
   levels='Pavel Burakov [ICE] & kindeX';
   comment='Beta 2 *** Freeware **** Special for PROGMEISTARS !';
   levext='.lev';
-  playdefitem=8;
+  playdefitem=2;
   freeitem=1;
   oxysec=10;
   play1=10;
@@ -28,7 +28,7 @@ const
   bombfire=4;
   barrelbomb=5;
   maxlose=11;
-  maxwin=6;
+  maxwin=5;
   maxstart=3;
   maxpmaxx=300;
   maxpmaxy=300;
@@ -174,13 +174,14 @@ type
      who,lastwho: 0..maxmon;
      dest:tdest;
      tip: tmaxmontip;
-     delay,statedel,vis,savedel,hero:longint;
+     delay,statedel,vis,savedel,hero,god:longint;
      state,curstate:tstate;
      health,armor,fired,buhalo,vempire:real;
      weap: tmaxweapon;
      w:set of tmaxweapon;
      bul:array[tmaxbul]of integer;
      procedure init(ax,ay,adx,ady:real; at:tmaxmontip; ad:tdest; aw:longint; aai,af:boolean; ah:longint);
+     function takegod(n:longint):boolean;
      function takeweap(n:tmaxweapon):boolean;
      function takebul(n:tmaxbul; m:integer):boolean;
      function takeitem(n:integer):boolean;
@@ -314,7 +315,7 @@ type
     procedure move;
   end;
   tplayer=object
-    enable,win,lose:boolean;
+    enable,win,lose,god:boolean;
     name:string[40];
     startx,starty,deftip,n,frag,die,kill:integer;
     startdest:tdest;
@@ -352,6 +353,7 @@ type
   end;
 (******************************** Variables *********************************)
 var
+  keybuf:string;
   must:array[0..maxmust]of
   record
     tip: integer;
@@ -365,7 +367,7 @@ var
     vis:string[8];
     skin:array[0..maxmonframe]of tnpat;
     weapon,ammo,count,max:longint;
-    health,armor,megahealth:real;
+    health,armor,megahealth,god:real;
     speed:real;
     cant:boolean;
   end;
@@ -419,7 +421,7 @@ var
     skin: tnpat;
     n: integer;
   end;
-  en:array[1..6]of tnpat;
+  en:array[1..7]of tnpat;
   time,rtimer:ttimer;
   map:tmap;
   speed:real;
@@ -767,6 +769,16 @@ begin
   mx:=round(x);
   my:=round(y);
 end;
+function tmon.takegod(n:longint):boolean;
+begin
+  if god=0 then
+  begin
+    god:=n;
+    takegod:=true;
+  end
+   else
+    takegod:=false;
+end;
 function tmon.takearmor(n:real):boolean;
 begin
   armor:=armor+n;
@@ -791,6 +803,7 @@ function tmon.takeitem(n:integer):boolean;
 var ok:boolean;
 begin
   ok:=false;
+  if it[n].god<>0 then ok:=ok or takegod(round(it[n].god/speed*mfps));
   if it[n].weapon<>0 then ok:=ok or takeweap(it[n].weapon);
   if it[n].ammo<>0 then ok:=ok or takebul(it[n].ammo,it[n].count);
   if it[n].armor<>0 then ok:=ok or takearmor(it[n].armor);
@@ -835,6 +848,7 @@ begin
   if not editor then
   begin
     box(x1,y1,x2,y2);
+    god:=map.m^[hero].god<>0;
     weap:=map.m^[hero].weap;
     health:=map.m^[hero].health;
     armor:=map.m^[hero].armor;
@@ -848,7 +862,10 @@ begin
   case multi of
   false:
   begin
-    p^[en[norm(1,6,round(7-6*health/maxhealth))]].put(minx,maxy-40);
+    if not god then
+     p^[en[norm(1,6,round(7-6*health/maxhealth))]].put(minx,maxy-40)
+    else
+     p^[en[7]].put(minx,maxy-40);
     digit(minx+30,maxy-35,round(health),'%');
     digit(minx+30,maxy-15,round(armor),' ');
     p^[weapon[weap].skin].sprite(minx+230,maxy-30);
@@ -929,6 +946,7 @@ begin
 end;
 procedure titem.draw(ax,ay:integer);
 begin
+  if it[tip].cant then dec(ay);
   if it[tip].max<=1 then
    p^[it[tip].skin[1]].spritesp(mx-ax,my-ay)
   else
@@ -1176,6 +1194,7 @@ var
   i:integer;
 begin
   know:=true;
+  if god>0 then exit;
 {  if fired=0 then }
   fired:=fired+oxy;
   if armor=0 then
@@ -1297,6 +1316,7 @@ begin
   fired:=fired-1;
   if fired<0 then fired:=0;
   if delay>0 then dec(delay);
+  if god>0 then dec(god);
   case curstate of
   run:begin
        state:=run;
@@ -1557,8 +1577,9 @@ begin
         if mx>=(getmaxx-4) then
         begin
           inc(ch);
-          t[1].b.done;
-          for j:=1 to maxt-1 do t[j].b:=t[j+1].b;
+{          t[1].b.done;
+          for j:=1 to maxt-1 do t[j].b:=t[j+1].b;}
+          for j:=1 to maxt do t[j].b:=loadbmp();
         end
         else
         if (mx<=4)and(ch>0) then
@@ -2640,6 +2661,7 @@ begin
       if s1='health' then health:=vlr(s2);
       if s1='megahealth' then megahealth:=vlr(s2);
       if s1='armor' then armor:=vlr(s2);
+      if s1='god' then god:=vlr(s2);
       if s1='cant' then cant:=boolean(downcase(s2)='true');
     end;
   end;
@@ -2883,8 +2905,9 @@ begin
 end;
 (******************************** PROGRAM ***********************************)
 var
-  i:longint;
+  i,j:longint;
   adelay:longint;
+  lev:string;
 begin
   randomize;
   clrscr;
@@ -2924,9 +2947,8 @@ begin
   skull2:=loadbmp('skull2');
   intro:=loadbmp('intro');
   for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
-  cur:=loadbmp('cursor'); for i:=1 to 6 do en[i]:=loadbmp('puh'+st(i));
-  heiskin[left]:=loadbmp('hai');
-  heiskin[right]:=loadbmpr('hai');
+  cur:=loadbmp('cursor'); for i:=1 to 7 do en[i]:=loadbmp('puh'+st(i));
+  heiskin[left]:=loadbmp('hai');  heiskin[right]:=loadbmpr('hai');
 {Init Screen...}
   writeln('Free RAM: ',memavail);
   initgraph(res); loadfont('8x8.fnt'); clear; mfps:=30; loadpal('playpal.bmp');
@@ -2962,6 +2984,7 @@ begin
   end;
 
   {Start game}
+  keybuf:='';
   if not editor then drawintro;
   GetIntVec($9,@vec);  SetIntVec($9,Addr(keyb));
   speed:=1;
@@ -2971,7 +2994,53 @@ begin
   repeat
     rtimer.easymove;time.move;  mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;
     {Manual}
-    while keypressed do readkey;
+    while keypressed do
+    begin
+      if length(keybuf)=255 then
+        keybuf:=copy(keybuf,2,254);
+      keybuf:=keybuf+downcase(readkey);
+      if not reswap then
+        if not death then
+      begin
+       if pos('god',keybuf)>0 then
+         begin
+           for i:=1 to maxpl do
+            if map.m^[player[i].hero].god=0 then map.m^[player[i].hero].god:=-1
+            else map.m^[player[i].hero].god:=0;
+           keybuf:='';
+          end;
+       if pos('all',keybuf)>0 then
+         begin
+           for i:=1 to maxpl do
+            for j:=1 to 39 do
+              map.m^[player[i].hero].takeitem(j);
+           keybuf:='';
+          end;
+       if pos('tank',keybuf)>0 then
+         begin
+           for i:=1 to maxpl do
+            for j:=41 to 60 do
+              map.m^[player[i].hero].takeitem(j);
+           keybuf:='';
+        end;
+       if pos('lev',keybuf)>0 then
+         begin
+           j:=pos('lev',keybuf)+3;
+           lev:=copy(keybuf,j,length(keybuf));
+           if pos('lev',lev)>0 then
+             keybuf:=copy(keybuf,j,length(keybuf));
+          with level do
+           for i:=1 to max do
+            if lev=downcase(name[i]) then begin cur:=i-1; j:=0; break; end;
+          if j=0 then
+          begin
+           for i:=1 to maxpl do
+              player[i].win:=true;
+            keybuf:='';
+          end;
+        end;
+      end;
+    end;
     for i:=1 to maxpl do player[i].move;
     {Move}
     map.move;
