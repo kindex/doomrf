@@ -5,11 +5,11 @@ program RF; {First verion: 27.2.2001}
 uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx,grx;
 {$ifndef dpmi} Real mode not supported {$endif}
 const
-  res:integer=0;
   accel:integer=-1;
   ppm=14; {pixel per meter (from plays.bmp)}
   ms=ppm/30; { meter/sec}
   ms2=ms/30; { meter/sec2}
+  botdir='bots\';
   wadfile='513.wad';
   levext='.lev';
   mousepl=4;
@@ -25,6 +25,7 @@ const
   maxpmaxx=300;
   maxpmaxy=300;
   cwall = 1 shl 0;  cstand= 1 shl 1;  cwater= 1 shl 2;  clava = 1 shl 3; cshl= 1 shl 4; cshr= 1 shl 5;
+     cFunc= 1 shl 6;
   cjump = 1 shl 0;
   cimp = 1 shl 1; cgoal = 1 shl 0;
   maxmon=196;
@@ -40,14 +41,20 @@ const
   maxedmenu=12;       maxmust=128;
   defx=200; defy=200; defname='';
   maxmonframe=10;
-  maxkey=7;  scroolspeed=4;
+  maxkey=7;
+  {esc Left Right Fire Jump}
+  ckey:array[1..3,1..maxkey]of byte=(
+  (1,$4b,$4d,$1d,72,54,80),
+  (1,30,32,15,17,16,31),
+  (1,79,81,28,76,78,80));
+  scroolspeed=12;
   truptime=30;
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
-  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  'Disabled',  'Disabled' );
-  ednodestr:array[1..4]of string[16]=
-  ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );
+  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  'Function',  '' );
+{  ednodestr:array[1..4]of string[16]=
+  ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
   edmenustr:array[1..maxedmenu]of string[16]=
   (  'Выход',  'Сохран',  'Загруз',  'Новая',  'Текстур',  'Стены',
    'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)'  );
@@ -76,11 +83,6 @@ const
   blood:tcolor=(m:180; r:12; del: 6{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
   blow:tcolor=(m:160; r:8; del:2);
-  {esc Left Right Fire Jump}
-  ckey:array[1..3,1..maxkey]of byte=(
-  (1,$4b,$4d,$1d,72,54,80),
-  (1,30,32,15,17,16,31),
-  (1,79,81,28,76,78,80));
   kexit=1;
   kleft=2;
   kright=3;
@@ -220,7 +222,7 @@ type
     dest: tdest;
     procedure init(ax,ay,asx,asy,at:integer);
     procedure move; virtual;
-    procedure draw(ax,ay:integer);
+    procedure draw(ax,ay,id:integer);
     function getsx:integer; virtual;
     function getsy:integer; virtual;
   end;
@@ -343,13 +345,6 @@ type
     function getherotip:integer;
     procedure done;
   end;
-  tfont=object
-     vis: string[8];
-     c:array[#0..#255]of tnpat;
-     d:integer;
-     procedure load(av:string; ad,method:integer);
-     procedure print(ax,ay:integer; s:string);
-  end;
   tlevel=object
     max,cur:integer;
     name:array[0..30]of string[8];
@@ -361,6 +356,7 @@ type
   end;
 (******************************** Variables *********************************)
 var
+  pkey:array[byte]of boolean;
   keybuf:string;
   must:array[0..maxmust]of
   record
@@ -442,13 +438,12 @@ var
   allwall:^arrayofstring8;
   mx,my,lastx,lasty,add:longint;push,push2,push3:boolean;
   mfps,skill,maxallwall:longint;
-  editor,endgame,multi,death,winall,first,rail,look,sniper,reswap:boolean;
+  editor,endgame,multi,death,first,rail,look,sniper,reswap:boolean;
   cur,skull1,skull2,intro:tnpat;
   vec:procedure;
   maxpl:integer;
   player:array[1..4]of tplayer;
   level:tlevel;
-  wb,rb:tfont;
   heiskin: array[tdest]of tnpat;
 (******************************** IMPLEMENTATION ****************************)
 procedure drawintro;
@@ -641,16 +636,6 @@ begin
     bul:=player[i].save.bul;
   end;
 end;
-procedure winallgame;
-begin
-  clear;
-  putbmpall('intro');
-  rb.print(50,70,'You are winner !');
-  rb.print(70,90,'Ты прошел все комнаты !');
-  screen;
-  delay(10);
-  winall:=true;
-end;
 procedure tlevel.next;
 var i:longint;
 begin
@@ -676,38 +661,6 @@ begin
   close(f);
   dec(max);
   savefirst:=name[1];
-end;
-procedure tfont.load;
-var i:char;
-   j:integer;
-begin
-  vis:=av;
-  d:=ad;
-  case method of
-  1:
-   begin
-   for i:=#0 to #255 do
-         c[i]:=loadbmp(upcase(vis+i));
-    for j:=0 to 9 do
-      c[char(j+48)]:=loadbmp('d'+st(j));
-     c['-']:=loadbmp('dminus');
-     c['.']:=loadbmp('-');
-   end;
-  2:
-    for i:=#0 to #255 do
-         c[i]:=loadbmp(upcase(vis+st0(byte(i),3)));
-  end;
-end;
-procedure tfont.print;
-var i,mx:integer;
-begin
-  s:=upcase(s); mx:=0;
-  for i:=1 to length(s) do
-  if s[i]=' ' then inc(mx,d) else
-  begin
-    p^[c[s[i]]].sprite(ax+mx,ay);
-    inc(mx,p^[c[s[i]]].x);
-  end;
 end;
 procedure initmust(atip,ax,ay,actip:integer; ad:tdest; del:real);
 var i:integer;
@@ -787,6 +740,7 @@ begin
 end;
 procedure tf.move;
 begin
+
  {error nothing?}
 end;
 function tf.getsx:integer;
@@ -794,6 +748,8 @@ begin getsx:=sx; end;
 function tf.getsy:integer;
 begin getsy:=sy; end;
 procedure tf.init(ax,ay,asx,asy,at:integer);
+var
+  i,j:integer;
 begin
   tobj.init(ax,ay,0,0,false);
   sx:=asx;
@@ -803,6 +759,10 @@ begin
   tip:=at;
   mx:=round(x);
   my:=round(y);
+
+  for i:=ax div 8 to (ax+asx)div 8 do
+    for j:=ay div 8 to (ay+asy)div 8 do
+     map.land[j]^[i].land:=map.land[j]^[i].land or cfunc;
 end;
 function tmon.takegod(n:longint):boolean;
 begin
@@ -1145,7 +1105,7 @@ begin
       then case f^[i].tip of
         10: win:=true;
         11: lose:=true;
-        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);
+{        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
       end;
 
    end;
@@ -1242,13 +1202,14 @@ end;
 procedure keyb; interrupt;
 var i,j:integer;
 begin
- for j:=1 to min(3,maxpl) do
+  pkey[port[$60] mod $80]:=port[$60]<$80;
+{ for j:=1 to min(3,maxpl) do
   for i:=1 to maxkey do
     if port[$60]=ckey[j,i] then player[j].key[i]:=true;
 
  for j:=1 to min(3,maxpl) do
    for i:=1 to maxkey do
-     if port[$60]=ckey[j,i]+$80 then player[j].key[i]:=false;
+     if port[$60]=ckey[j,i]+$80 then player[j].key[i]:=false;}
  inline ($60);
  vec;
 end;
@@ -1491,7 +1452,7 @@ begin
   if barrel and not life then exit;
   if god<>0 then exit;
 {  if fired=0 then }
-  fired:=fired+coxy;
+  fired:=fired+coxy{*byte(hero>0)};
   if armor=0 then
   health:=health-hit-bomb
   else
@@ -1544,6 +1505,14 @@ begin
     deldam:=round(mfps/speed);
   end;
 
+  if inwall(cfunc)then
+   with map do
+    for i:=0 to maxf do
+     if f^[i].enable then
+     if (mx>=f^[i].x)and (my>=f^[i].y)and
+     (mx<=f^[i].x+f^[i].getsx)and (my<=f^[i].y+f^[i].getsy) then
+      if f^[i].tip=12 then damage(x,y,0,33,0,hero);
+
   if deldam=0 then
   begin
     if inwall(cwater) then
@@ -1551,7 +1520,7 @@ begin
       fired:=0; {OXY}
       deldam:=round(0.1*mfps/speed);
       if oxy>0 then oxy:=oxy-1;
-      if oxy=0 then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,who);end;
+      if (oxy=0)and(hero>0) then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,who);end;
     end else
     begin
       if oxy=0 then oxy:=20;
@@ -1645,7 +1614,7 @@ begin
 {    ty:=round(ry*8);}
     if (ty<=0)or(ty>=map.y-1)or(tx<=0)or(tx>=map.x-1) then break;
     case sniper of
-     false: if (abs(target.x-tx*8)<32)and(abs(target.y-ty*8)<32)then begin see:=true; break; end;
+     false: if (abs(target.x-tx*8)<16)and(abs(target.y-ty*8)<32)then begin see:=true; break; end;
      true:  if (abs(target.x-tx*8)<32)and(abs(target.y-ty*8)<(abs(target.x-tx*8)))then begin see:=true; break; end;
     end;
     if (map.land[ty]^[tx].land and cwall)>0 then begin see:=false; break; end;
@@ -1684,7 +1653,7 @@ begin
       if target.x<self.x then include(key,kleft) else include(key,kright);
      end
      else
-    if random(1000)=0 then include(key,kjump);
+    if random(300)=0 then include(key,kjump);
     if (weap=1)or((fired>0)and(sniper)) then if target.x<self.x then include(key,kleft) else include(key,kright);
   end;
   if see then begin include(key,katack); know:=true; end;
@@ -1750,10 +1719,6 @@ begin
   if dx>x*8-(maxx-minx) then dx:=x*8-(maxx-minx);
   if dy>y*8-(maxy-miny) then dy:=y*8-(maxy-miny);
 end;
-function exist(s:string):boolean;
-begin
-  exist:=w.exist(s) or fexist(s+'.bmp')or fexist(dbmp+s+'.bmp');
-end;
 (*procedure tbmp.save;
 var f:file;
    b:tbitmap;
@@ -1806,7 +1771,7 @@ var i,j:longint;
 begin
   map.draw;
   if cool or (what=wall) then map.drawhidden;
-  for i:=0 to maxf do if map.f^[i].enable then map.f^[i].draw(map.dx,map.dy);
+  for i:=0 to maxf do if map.f^[i].enable then map.f^[i].draw(map.dx,map.dy,i);
   map.drawnodes;
   case what of
    func:
@@ -1912,9 +1877,10 @@ begin
            map.done;
            map.create(defx,defx,0,0,defname);
            map.clear;
-           wb.print(100,50,'Авторские права');
+           wb.print(100,110,'Авторские права');
            s:='Создал: ';
-           readline(1,100,map.copy,s,white,0);
+           readline(1,160,map.copy,s,white,0);
+           map.initnode(32,32,nodes.mask);
          end;
        end;
     5: begin scry:=getmaxy-50; what:=face;  end;
@@ -2282,13 +2248,42 @@ end;
 procedure tobj.move;
 var
   savex,savey:real;
-  x1,y1,x2,y2,i,j:longint;
+  x1,y1,x2,y2,i,j,ti,tj:longint;
   br:boolean;
 begin
   dy:=dy+map.g*speed;
   savex:=x;
   savey:=y;
   x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
+
+  if (inwall(cFunc)){or(inwall(cButton))} then begin
+   with map do
+    for i:=0 to maxf do
+     if f^[i].enable then
+     if
+     (mx>=f^[i].x)and
+     (my>=f^[i].y)and
+     (mx<=f^[i].x+f^[i].getsx)and
+     (my<=f^[i].y+f^[i].getsy)
+      then case f^[i].tip of
+{        10: win:=true;
+        11: lose:=true;
+        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
+        13{Teleport}: begin
+          self.x:=self.x+(f^[i+1].x-f^[i].x);
+          self.y:=self.y+(f^[i+1].y-f^[i].y);
+        end;
+        15,16{Open Door}: begin
+          j:=i+1;
+          for ti:=(round(f^[j].x) div 8) to  round(f^[j].x+f^[j].sx) div 8 do
+            for tj:=(round(f^[j].y) div 8) to  round(f^[j].y+f^[j].sy) div 8 do begin
+              land[tj]^[ti].vis:=byte(f^[i].tip=16);
+              land[tj]^[ti].land:=byte(f^[i].tip=16);
+            end;
+        end;
+      end;
+  end;
+
   if inwall(cwall) then
   begin
     x:=savex;
@@ -2377,9 +2372,9 @@ var
 begin
   rectangle(mx-ax,my-ay,mx-ax+sx,my-ay+sy,white);
   for i:=0 to maxfname do
-   if fname[i].n=tip then begin cur:=i; break; end;
+    if fname[i].n=tip then begin cur:=i; break; end;
   p^[fname[cur].skin].spritesp(mx-ax,my-ay);
-  print(mx-ax,my-ay,white,fname[cur].name);
+  print(mx-ax,my-ay,white,fname[cur].name+' - '+st(id));
 end;
 procedure tobj.draw;
 begin
@@ -2775,9 +2770,10 @@ begin
   if a and cwall>0 then getcol:=white;
   if a and cstand>0 then getcol:=green;
   if a and clava>0 then getcol:=red;
-  if a and cwater>0 then getcol:=green;
+  if a and cwater>0 then getcol:=blue;
   if a and cshl>0 then getcol:=grey;
   if a and cshr>0 then getcol:=dark;
+  if a and cFunc>0 then getcol:=blue;
 end;
 begin
   x1:=dx div 8;
@@ -2926,7 +2922,13 @@ var dat:text;
 begin
   assign(dat,'wall.dat');
   reset(dat);
-  readln(dat,k);
+  k:=0;
+  while not seekeof(dat) do begin readln(dat); inc(k);end;
+  close(dat);
+
+  assign(dat,'wall.dat');
+  reset(dat);
+{  readln(dat,k);}
 {  if debug and(k>10) then k:=10;}
   getmem(allwall,(k+1)*9);
   for i:=1 to k do
@@ -3229,7 +3231,7 @@ var
   s,s1,s2:string;
   nm,i,j:longint;
 begin
-  assign(f,name);
+  assign(f,botdir+name);
   reset(f);
   while not eof(f) do
   begin
@@ -3275,14 +3277,19 @@ procedure draw;
 var i,j,sx,sy:integer;
 begin
   clear;
+{  putintro('intro'); Update - }
   sx:=(getmaxx-p^[intro].x) div 2;
   sy:=(getmaxy-p^[intro].y) div 2;
+
   p^[intro].put(sx,sy);
-  rb.print(sx+5,sy+192,game+' ['+version+']');
+
+  rb.print(getmaxx div 2-152,getmaxy-10,shortintro);
+
   for i:=1 to max do
     wb.print(x1,y1+(i-1)*d,men[i]);
   if hod mod 90<45 then j:=skull1 else j:=skull2;
   p^[j].sprite(x1-30,y1-5+(ch-1)*d);
+
   screen;
 end;
 begin
@@ -3334,7 +3341,7 @@ var
   g:searchrec;
   f:text;
 begin
-  findfirst('bot*.ini',anyfile,g);
+  findfirst(botdir+'bot*.ini',anyfile,g);
   s:=0;
   while doserror=0 do
   begin
@@ -3468,18 +3475,6 @@ begin
   dec(level.cur);
   level.next;
   time.clear;
-end;
-procedure loadres;
-var f:text;
-   b:string;
-begin
-  assign(f,'res.ini');
-{$i-}  reset(f); {$i+}
-if ioresult<>0 then exit;
-  readln(f,res);
-  readln(f,b);
-  if downcase(b)='on' then sfps:=true;
-  close(f);
 end;
 {procedure weaponinfo;
 var i:integer;
