@@ -21,11 +21,15 @@ const
   maxmon=100;
   maxitem=100;
   maxf=100;
+  maxpix=200;
+  maxpul=100;
   maxmontip=32;
   scry=19*8;
   scrx=260;
   maxt=320 div 8;
   maxedmenu=10;
+  fupr=0.5;
+  fupr2=0.9;
   edwallstr:array[1..8]of string[16]=
   (
   'Стена',
@@ -89,16 +93,23 @@ type
   tland=array[0..maxy]of ^tmapar;
   tobj=object
     enable:boolean;
-    mx,my:integer;
+    lx,ly,mx,my:integer; {map}
     x,y,dx,dy:real;
     constructor new;
     procedure init(ax,ay,adx,ady:real);
     function getsx:integer; virtual;
     function getsy:integer; virtual;
     procedure move;   virtual;
-    procedure draw;
+    procedure draw(ax,ay:integer);
     procedure done;   virtual;
     function inwall:boolean;
+  end;
+  tpix=object(tobj)
+    color:byte;
+    life:longint;
+    procedure init(ax,ay,adx,ady:real; ac,al:longint);
+    procedure move; virtual;
+    procedure draw(ax,ay:integer);
   end;
   tmon=object(tobj)
      tip: tmaxmontip;
@@ -119,6 +130,8 @@ type
   arrayofmon=array[0..maxmon]of tmon;
   arrayofitem=array[0..maxitem]of titem;
   arrayoff=array[0..maxf]of tf;
+  arrayofpix=array[0..maxpix]of tpix;
+  arrayofpul=array[0..maxpul]of tpul;
   tmap=object
     name:string[8];
     land:tland;
@@ -129,6 +142,8 @@ type
     m:^arrayofmon;
     item:^arrayofitem;
     f:^arrayoff;
+    pix:^arrayofpix;
+    pul:^arrayofpul;
     procedure new;
     procedure create(ax,ay,adx,ady:longint; aname:string);
     procedure reloadpat;
@@ -144,7 +159,8 @@ type
     procedure draw;
     procedure drawhidden;
     procedure move;
-    procedure initmon(ax,ay,at:longint);
+    procedure initmon(ax,ay:real; at:longint);
+    procedure initpix(ax,ay,adx,ady:real; ac,al:longint);
   end;
   ted=object
     what: (face,wall,mons,items,func);
@@ -179,7 +195,7 @@ var
   allwall:^arrayofstring8;
   mx,my:longint;
   push,push2:boolean;
-  debug,editor,endgame:boolean;
+  debug,editor,endgame,sfps:boolean;
   cur:tnpat;
 (******************************** IMPLEMENTATION ****************************)
 procedure ted.draw;
@@ -328,11 +344,6 @@ begin
       if freex>=320 then begin dec(maxtt); break; end;
    end;
 end;
-constructor tobj.new; begin {nothing} end;
-function tobj.getsx:integer;
-begin getsx:=1; end;
-function tobj.getsy:integer;
-begin getsy:=1; end;
 function loadbmp(s:string):tnpat;
 var i:longint;
 begin
@@ -347,7 +358,7 @@ begin
     end;
   loadbmp:=0;
 end;
-procedure tmap.initmon(ax,ay,at:longint);
+procedure tmap.initmon;
 var i:longint;
 begin
   for i:=0 to maxmon do
@@ -357,9 +368,57 @@ begin
       exit;
     end;
 end;
+procedure tmap.initpix;
+var i:longint;
+begin
+  for i:=0 to maxpix do
+    if not pix^[i].enable then
+    begin
+      pix^[i].init(ax,ay,adx,ady,ac,al);
+      exit;
+    end;
+end;
+procedure tpix.move;
+begin
+  dec(life);
+  if life=0 then begin done; exit; end;
+  tobj.move;
+end;
+procedure tobj.move;
+var savex,savey:real;
+begin
+  dy:=dy+map.g;
+  savex:=x;
+  savex:=y;
+  x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
+  if inwall then
+  begin
+    x:=savex;
+    dx:=-dx*fupr;
+    dy:=dy*fupr2;
+    mx:=round(x); lx:=mx div 8;
+  end;
+  y:=y+dy*speed; my:=round(y); ly:=my div 8;
+  if inwall then
+  begin
+    y:=savey;
+    dy:=-dy*fupr;
+    dx:=dx*fupr2;
+    my:=round(y); ly:=my div 8;
+  end;
+end;
+constructor tobj.new; begin {nothing} end;
+function tobj.getsx:integer;
+begin getsx:=1; end;
+function tobj.getsy:integer;
+begin getsy:=1; end;
+procedure tpix.draw;
+begin
+  putpixel(mx-ax,my-ay,color);
+end;
 procedure tobj.draw;
 begin
-  putpixel(mx,my,white);
+  putpixel(mx-ax,my-ay,white);
 end;
 function tmon.getsx:integer;
 begin
@@ -380,13 +439,30 @@ begin
   x:=ax; y:=ay;
   dx:=adx; dy:=ady;
 end;
+procedure tpix.init;
+begin
+  tobj.init(ax,ay,adx,ady);
+  color:=ac;
+  life:=al;
+end;
 procedure tobj.done;
 begin
   enable:=false;
 end;
 function tobj.inwall:boolean;
+var
+  i,j,sx,sy,x1,y1,x2,y2:integer;
+  ok:boolean;
 begin
-
+  sx:=getsx;
+  sy:=getsy;
+  x1:=lx-sx div 2; x2:=x1+sx-1;
+  y2:=ly; y1:=y2-sy;
+  if (x1<0)or(y1<0)or(x2>=map.x)or(y2>=map.y) then begin inwall:=true; exit; end;
+  for i:=x1 to x2 do
+    for j:=y1 to y2 do
+    if map.land[j]^[i].land and cwall>0 then begin inwall:=true; exit; end;
+  inwall:=false;
 end;
 procedure tmap.pset;
 begin
@@ -490,12 +566,6 @@ begin
   blockwrite(ff,f^,sizeof(tf)*mf);
   close(ff);
 end;
-procedure tobj.move;
-begin
-  dy:=dy+map.g;
-  x:=x+dx;
-  y:=y+dy;
-end;
 procedure tmap.done;
 var i:longint;
 begin
@@ -515,6 +585,11 @@ begin
     for j:=0 to scry div 8 do
      if land[j+y1]^[i+x1].vis<>0 then
        p[pat[land[j+y1]^[i+x1].vis]].put(i*8-x2,j*8-y2);
+  for i:=0 to maxmon do if m^[i].enable then m^[i].draw(dx,dy);
+  for i:=0 to maxitem do if item^[i].enable then item^[i].draw(dx,dy);
+  for i:=0 to maxf do if f^[i].enable then f^[i].draw(dx,dy);
+  for i:=0 to maxpix do if pix^[i].enable then pix^[i].draw(dx,dy);
+  for i:=0 to maxpul do if pul^[i].enable then pul^[i].draw(dx,dy);
 end;
 procedure tmap.drawhidden; {40x25}
 var i,j:longint;
@@ -594,6 +669,8 @@ begin
   system.new(m); fillchar32(m^,0,sizeof(m^),0);        for i:=0 to maxmon do m^[i].new;
   system.new(item);fillchar32(item^,0,sizeof(item^),0);for i:=0 to maxitem do item^[i].new;
   system.new(f);  fillchar32(f^,0,sizeof(f^),0);       for i:=0 to maxf do f^[i].new;
+  system.new(pix);  fillchar32(pix^,0,sizeof(pix^),0); for i:=0 to maxpix do pix^[i].new;
+  system.new(pul);  fillchar32(pul^,0,sizeof(pul^),0);       for i:=0 to maxpul do pul^[i].new;
 end;
 procedure loadpal(s:string);
 var i:longint;
@@ -677,9 +754,11 @@ var i:longint;
 begin
   if not editor then
   begin
-    for i:=0 to maxmon do if m^[i].enable then m^[i].move;
     for i:=0 to maxitem do if item^[i].enable then item^[i].move;
+    for i:=0 to maxmon do if m^[i].enable then m^[i].move;
     for i:=0 to maxf do if f^[i].enable then f^[i].move;
+    for i:=0 to maxpix do if pix^[i].enable then pix^[i].move;
+    for i:=0 to maxpul do if pul^[i].enable then pul^[i].move;
   end
   else
   begin
@@ -725,7 +804,8 @@ end;
 procedure ttimer.move;
 begin
   inc(hod);  gettime;
-  if (hod mod 10=0)and(hod>100)then getfps;
+{  if (hod mod 10=0)and(hod>100)then getfps;}
+  if (hod>5)then getfps;
   if hod=1000 then begin getfps; clear;end;
 end;
 procedure ttimer.gettime;
@@ -769,16 +849,21 @@ begin
   close(dat);
 end;
 (******************************** PROGRAM ***********************************)
-var i:longint;
+var
+  i:longint;
+  adelay,mfps:longint;
 begin
 {  debug:=true;}
-  editor:=true;
+{  editor:=true;}
+  sfps:=true;
+  monster[1].x:=1;
+  monster[1].y:=1;
   w.load(wadfile);
   loadwalls;
   map.new;
-  map.create(defx,defy,0,0,defname); map.g:=-0.1;
-{  map.load('temp');}
-  init320x200; loadfont('8x8.fnt');     clear;
+{  map.create(defx,defy,0,0,defname); }map.g:=0.05;
+  map.load('temp');
+  init320x200; loadfont('8x8.fnt'); clear; mfps:=30;
   loadpal('playpal');
 {  w.findfirst('playa'); w.findstr:='*';}
   cur:=loadbmp('cursor');
@@ -791,6 +876,7 @@ begin
   endgame:=false;
   time.clear;
   repeat
+    map.initpix(230,30,random*5-2.5,random*5-2.5,time.hod div 4,200);
     time.move;
     mx:=mouse.x;
     my:=mouse.y;
@@ -807,8 +893,16 @@ begin
     map.draw;
     if editor then ed.draw;
     print(290,190,white,st0(round(time.fps),3));
+    print(200,190,white,st0(round(speed*100),4));
     if editor then p[cur].putblack(mx,my);
     screen;
+    if time.fps<>0 then speed:=mfps/time.fps;
+    if (not editor)and sfps then
+    begin
+      adelay:=round(adelay+(time.fps-mfps)*1000);
+      if adelay<0 then adelay:=0;
+      for i:=0 to adelay do;
+    end;
   until endgame;
   savepal('doom.pal');
   closegraph;
