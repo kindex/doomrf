@@ -1,16 +1,17 @@
-{$Mode Tp}
-//{$A+,B+,D+,E-,F-,G+,I+,L+,N+,P-,Q-,R-,S-,T-,V+,X+,Y+ Final}
-//{$M $fff0,0,655360}
+{$Ifndef FPC} Turbo Pascal not supported. Only Free Pascal GOS (Go32v2){$endif}
 {$ifndef dpmi} Real mode not supported {$endif}
-{$Ifndef FPC} Turbo Pascal not supported. Only Free Pascal{$endif}
+{$Mode Tp}
 program RF; {First verion: 27.2.2001}
-uses crt,mycrt,mouse,wads,dos{,grafx},fpgraph,grx,sprites,rfunit,timer, api,ports;
-const {(C) DiVision: kIndeX (Thanks to Zonik & Dark Sirius)}
+uses crt,mycrt,mouse,wads,dos,fpgraph,grx,sprites,rfunit,timer,api,ports;
+const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   accel:integer=-1;
   botdir='bots\';
   levdir='Levels\';
   wadfile='513.wad';
   levext='.lev';
+  defence1:real=1/4;
+  defence2:real=1/3;
+  fraglimit:integer=-1;
   mousepl=4;
   kniferange=33;
   oxysec=10;
@@ -21,6 +22,9 @@ const {(C) DiVision: kIndeX (Thanks to Zonik & Dark Sirius)}
   maxpmaxy=200;
   cwall = 1 shl 0;  cstand= 1 shl 1;  cwater= 1 shl 2;  clava = 1 shl 3; cshl= 1 shl 4; cshr= 1 shl 5;
      cFunc= 1 shl 6; cDeath=1 shl 7;
+
+  cOverDraw=cshl+cshr; // Поверх
+
   cjump = 1 shl 0;
   cimp = 1 shl 1; cgoal = 1 shl 0;
   maxmon=196;
@@ -48,15 +52,15 @@ const {(C) DiVision: kIndeX (Thanks to Zonik & Dark Sirius)}
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
-  ('Стена',  'Ступень',  'Вода',  'Лава',  '<<',  '>>',  'Function',  'Deathmatch/Поверх' );
+  ('Стена',  'Ступень',  'Вода',  'Лава',  '<< /Over',  '>> /Over',  'Function',  'Deathmatch');
 {  ednodestr:array[1..4]of string[16]=
   ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
-  maxedmenu=12+5+4+1;
+  maxedmenu=12+5+4+1+2;
   edmenustr:array[1..maxedmenu]of string[16]=
-  (  'Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
+  ('Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
    'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)',
    'Оружие','Патроны','Аптечки','Интерьер','Колонны',
-   '','Пусто','Стена','Ступень','Обои');
+   '','Пусто','Стена','Ступень','Обои','Текстуры+','Стены+');
 type
   real=single;
   tcapt=array[1..4]of char;
@@ -95,8 +99,9 @@ type
   tmapar=array[0..maxpmaxx]of tmapelement;
   tland=array[0..maxpmaxy]of ^tmapar;
   tobj=object
-    enable,standing,first,down,elevator:boolean;
+    enable,standing,first,down,elevator,upr:boolean;
     lx,ly,mx,my,startx,starty:integer; {map}
+    savex,savey:real;
     x,y,dx,dy:real;
     constructor newObj;
     procedure init(ax,ay,adx,ady:real; af:boolean);
@@ -107,6 +112,7 @@ type
     function getftr:real; virtual;
     function getupr:real; virtual;
     function getg:real; virtual;
+    function check:boolean; virtual;
     procedure move;   virtual;
     procedure draw(ax,ay:integer);
     procedure done;   virtual;
@@ -165,7 +171,7 @@ type
      function takearmor(n:real):boolean;
      function takehealth(n:real):boolean;
      function takemegahealth(n:real):boolean;
-     procedure dier;
+     procedure dier(dwho: integer);
      procedure attack(nweap: longint);
      function getsx:integer; virtual;
      function getsy:integer; virtual;
@@ -183,8 +189,8 @@ type
      procedure damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
      procedure setstate(as:tstate; ad: real);
      procedure setcurstate(as:tstate; ad: real);
-     procedure kill;
-     procedure explode;
+     procedure kill(dwho: integer);
+     procedure explode(dwho: integer);
      procedure giveweapon;
      procedure moveai;
      procedure done; virtual;
@@ -197,6 +203,7 @@ type
      procedure init(ax,ay, adx,ady:real; at,aw:integer; qd: boolean);
      procedure draw(ax,ay:integer);
      procedure move; virtual;
+     function check:boolean; virtual;
      procedure detonate;
      function getftr:real; virtual;
      function getupr:real; virtual;
@@ -288,7 +295,9 @@ type
     function space(ax,ay: integer): boolean;
   end;
   ted=object
-    what: (face,wall,mons,items,func,node, wlp);
+    what: (face,wall,mons,items,func,node, wlp, fillwall, fillface);
+    startd,startd2,endd,endd2: record x,y: integer; end;
+    drag,drag2: boolean;
     cured:longint;
     mon,itm:record
       cur,shift:integer;
@@ -331,8 +340,9 @@ type
     startx,starty,deftip,n,frag,die,kill:longint;
     startdest:tdest;
     health,maxhealth,armor,oxy:real;
+    drugs,reverse,shift,cwave: longint;
     weap: tmaxweapon;
-    tip,ammo,x1,y1,x2,y2:longint;
+    tip,ammo,ammo2,x1,y1,x2,y2:longint;
     hero: longint;
     key:tkeys;
     save:tmon;
@@ -367,9 +377,10 @@ type
   end;
 (******************************** Variables *********************************)
 var
+  scrmode: (normal,reverse,shift,wave);
   unpush: boolean;
   keybuf,wintext1,wintext2:string;
-  pnode,pnodei,pnodeg: tnpat;
+  pnode,pnodei,pnodeg, panel1,panel2: tnpat;
   time,rtimer:ttimer;
   map:tmap;
   speed:real;
@@ -378,7 +389,7 @@ var
   dminus,dpercent:tnpat;
 {  p:array[0..maxpat]of tbmp;}
 {  names:array[byte]of string[8];}
-  allwall:^arrayofstring8;
+  allwall: arrayofstring8;
   mx,my,lastx,lasty,add:longint;
   push,push2,push3,loaded:boolean;
   mfps,maxallwall:longint;
@@ -386,8 +397,12 @@ var
 //  vec:procedure;
   player:array[1..maxplays]of tplayer;
   level:tlevel;
+  lastinidir,winallbmp,startbmp,winbmp,losebmp:string;
 {  heiskin: array[tdest]of tnpat;}
+procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
+
+
 procedure tmon.setdelay(n:longint);
 begin
   delay:=round(n/usk);
@@ -416,7 +431,9 @@ end;
 procedure winallgame;
 begin
   clear;
-  putbmpall('intro');
+
+  putbmpall(winallbmp);
+
   wb.print((getmaxx-rb.width(wintext1))div 2,getmaxy div 2-40,wintext1);
   wb.print((getmaxx-rb.width(wintext2))div 2,getmaxy div 2,wintext2);
   screen;
@@ -491,8 +508,8 @@ end;
 procedure weaponinfo;
 var i:integer;
 begin
-  writeln;
-  writeln('Урон от оружия в секунду.');
+//  writeln;
+//  writeln('Урон от оружия в секунду.');
   for i:=0 to maxweapon do
    with weapon[i] do
    if name<>'' then
@@ -524,9 +541,32 @@ begin
       s1:=downcase(copy(s,1,i-1));
       s2:=copy(s,i+1,length(s)-i);
 {      if s1='intro' then p^[intro].load(s2);}
+      if s1='parent' then
+        loadmod(s2+'.mod');
+
       if s1='intro' then
         intro:=loadasbmp(s2);
-      if s1='skull' then begin
+
+      if s1='panel1' then
+        panel1:=loadasbmp(s2);
+      if s1='panel2' then
+        panel2:=loadasbmp(s2);
+
+      if s1='blood' then
+        bloodu:=vlr(s2);
+      if s1='speed' then
+        ausk:=vlr(s2);
+
+      if s1='fraglimit' then
+        fraglimit:=vl(s2);
+
+      if s1='diskload' then
+        diskload:=boolean(s2='true');
+
+      if s1='30fps' then
+        sfps:=boolean(s2='true');
+
+      if s1='cursor' then begin
         skull1:=loadbmp(s2+'1');
         skull2:=loadbmp(s2+'2');
       end;
@@ -536,6 +576,7 @@ begin
         freeitem:=vl(s2);
       if s1='wintext1' then wintext1:=s2;
       if s1='wintext2' then wintext2:=s2;
+      if s1='winallbmp' then winallbmp:=s2;
       if s1='inidir' then inidir:=s2+'\';
       if s1='free death item' then
         freemultiitem:=vl(s2);
@@ -547,14 +588,12 @@ begin
         multiitem:=vl(s2);
       if copy(s1,1,3)='tip' then
         bot[vl(copy(s1,4,1))].tip:=vl(s2);
-   {Update - Start lose, Win}
+
+      if s1='start' then startbmp:=s2;
+      if s1='win' then winbmp:=s2;
+      if s1='lose' then losebmp:=s2;
     end;
   end;
-end;
-procedure loadmod(a:string);
-begin
-  level.loadini(a);
-  loadmodfile(a);
 end;
 function tmap.space(ax,ay: integer): boolean;
 var
@@ -602,18 +641,38 @@ begin
   writeln(f,a);
   close(f);}
 end;
-procedure drawintro;
-var t:tnpat;
+
+procedure putlogo(a,b:string; del: integer);
+var
+  c: integer;
 begin
   clear;
   box(0,0,getmaxx,getmaxy);
-  if putbmpall('start'+st(random(maxstart)+1)) then
-  begin
-    rb.print(getmaxx div 2-40,getmaxy-10,'В это время...');
+  c:=1;
+  while exist(a+st(c)) do inc(c);
+  dec(c);
+  c:=random(c)+1;
+  if exist(a+st(c)) then begin
+    putbmpall(a+st(c));
+    rb.print((getmaxx-rb.width(b)) div 2,getmaxy-10,b);
     screen;
-    delay(3);
+    delay(del);
   end;
 end;
+
+procedure drawwin;
+begin
+  putlogo(winbmp,'Теперь можно отпразновать победу',3);
+end;
+procedure drawlose;
+begin
+  putlogo(losebmp,'У вас проблемы со здоровьем',3);
+end;
+procedure drawintro;
+begin
+  putlogo(startbmp,'В это время...',3);
+end;
+
 procedure tnode.dellink(an:integer);
 var cur,j:integer;
 begin
@@ -944,6 +1003,10 @@ begin
   lose:=false;
 
   order.kind:=no;
+  drugs:=0;
+  cwave:=0;
+  shift:=0;
+  reverse:=0;
 end;
 function tplayer.getherotip:integer;
 begin
@@ -1018,6 +1081,23 @@ begin
   ok:=false;
   if it[nn].god<>0 then
      ok:=takegod(round(it[nn].god/speed*mfps)) or ok;
+
+  if (it[nn].drugs<>0)and(hero<>0) then begin
+    inc(player[hero].drugs,round(it[nn].drugs*mfps/speed));
+    ok:=true;
+  end;
+  if (it[nn].wave<>0)and(hero<>0) then begin
+    inc(player[hero].cwave,round(it[nn].wave*mfps/speed));
+    ok:=true;
+  end;
+  if (it[nn].shift<>0)and(hero<>0) then begin
+    inc(player[hero].shift,round(it[nn].shift*mfps/speed));
+    ok:=true;
+  end;
+  if (it[nn].reverse<>0)and(hero<>0) then begin
+    inc(player[hero].reverse,round(it[nn].reverse*mfps/speed));
+    ok:=true;
+  end;
 
   if it[nn].longjump<>0 then begin
     longjump:=it[nn].longjump;
@@ -1124,6 +1204,7 @@ begin
     tip:=map.m^[hero].tip;
     maxhealth:=monster[tip].health;
     ammo:=map.m^[hero].bul[weapon[weap].bul];
+    ammo2:=map.m^[hero].bul[weapon[-weap].bul];
     if not drowed then exit;
     box(x1,y1,x2,y2);
     map.setdelta(round(map.m^[hero].x),round(map.m^[hero].y-14),(x2-x1) div 2,(y2-y1) div 2);
@@ -1146,34 +1227,81 @@ begin
   case level.multi of
   false:
   begin
+    p[panel1].sprite(minx,maxy-40);
     if not god then
      p[en[norm(1,6,round(7-6*health/maxhealth))]].put(minx,maxy-40)
     else
      p[en[7]].put(minx,maxy-40);
-    digit(minx+30,maxy-35,round(health),'%');
-    digit(minx+30,maxy-15,round(armor),' ');
+
+    digit(minx+30,maxy-37,round(health),'%');
+    digit(minx+30,maxy-17,round(armor),' ');
 
     for i:=1 to map.m^[hero].w[weap] do
-      p[weapon[weap].skin].sprite(minx+230+(i-1)*10,maxy-30+(i-1)*10);
+      p[weapon[weap].skin].sprite(minx+150+(i-1)*10,maxy-35+(i-1)*10);
 
-    rb.print(minx+230,maxy-15,st(ammo));
-{    if oxy<100 then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(oxy),'%');
-    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
+    digit(minx+100,maxy-37,ammo,' ');
+    if (weapon[-weap].bul<>weapon[weap].bul)and(ammo2>0)then
+      digit(minx+100,maxy-17,ammo2,' ');
+
+    if map.m^[hero].qdamage>0 then
+      rb.print(minx+300,maxy-40,'QDamage: '+st(round(map.m^[hero].qdamage/rtimer.fps)));
+    if map.m^[hero].aqua then
+      rb.print(minx+300,maxy-30,'Акваланг');
+    if map.m^[hero].longjumpn>0 then
+      rb.print(minx+300,maxy-20,'Прыжков: '+st(map.m^[hero].longjumpn));
+
+    if map.m^[hero].armorhit>0 then
+      rb.print(minx+210,maxy-40,'Armor: '+st(round(map.m^[hero].armorhit/rtimer.fps)));
+    if map.m^[hero].armorbomb>0 then
+      rb.print(minx+210,maxy-30,'Bomb: '+st(round(map.m^[hero].armorBomb/rtimer.fps)));
+    if map.m^[hero].armorfreez>0 then
+      rb.print(minx+210,maxy-20,'No Freez: '+st(round(map.m^[hero].armorFreez/rtimer.fps)));
+    if map.m^[hero].armoroxy>0 then
+      rb.print(minx+210,maxy-10,'No Fire: '+st(round(map.m^[hero].armorOxy/rtimer.fps)));
+
   end;
   true:
   begin
 {    p[en[norm(1,6,round(7-6*health/maxhealth))]].putblack(0,160);}
-    digit(maxx-56,miny,round(health),'%');
-    digit(maxx-56,miny+17,round(armor),' ');
+    p[panel2].sprite(maxx-60,miny);
+    digit(maxx-56,miny+4,round(health),'%');
+    digit(maxx-56,miny+17+4,round(armor),' ');
+
     for i:=1 to map.m^[hero].w[weap] do
-      p[weapon[weap].skin].spritec(maxx-28+(i-1)*10,miny+45+(i-1)*10);
+      p[weapon[weap].skin].spritec(maxx-28+(i-1)*10,miny+50+(i-1)*10);
+
     digit(maxx-56,miny+50,ammo,' ');
-    rb.print(maxx-56,miny+66,'Frags:'+st(frag));
-    rb.print(maxx-56,miny+74,'Kills:'+st(kill));
-    rb.print(maxx-56,miny+82,'Die  :'+st(die));
-{    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
+    if (weapon[-weap].bul<>weapon[weap].bul)and(ammo2>0)then
+      digit(maxx-56,miny+65,ammo2,' ');
+
+    rb.print(maxx-57,miny+15+66,'Frags:'+st(frag));
+    rb.print(maxx-57,miny+15+74,'Kills:'+st(kill));
+    rb.print(maxx-57,miny+15+82,'Die: '+st(die));
+
+    if map.m^[hero].qdamage>0 then
+      rb.print(maxx-60,miny+110,'QDam '+st(round(map.m^[hero].qdamage/rtimer.fps)));
+    if map.m^[hero].aqua then
+      rb.print(maxx-60,miny+120,'Акваланг');
+    if map.m^[hero].longjumpn>0 then
+      rb.print(maxx-60,miny+130,'Jump '+st(map.m^[hero].longjumpn));
+
+    if map.m^[hero].armorhit>0 then
+      rb.print(maxx-60,miny+140,'Armor '+st(round(map.m^[hero].armorhit/rtimer.fps)));
+    if map.m^[hero].armorbomb>0 then
+      rb.print(maxx-60,miny+150,'Bomb '+st(round(map.m^[hero].armorBomb/rtimer.fps)));
+    if map.m^[hero].armorfreez>0 then
+      rb.print(maxx-60,miny+160,'Freez '+st(round(map.m^[hero].armorFreez/rtimer.fps)));
+    if map.m^[hero].armoroxy>0 then
+      rb.print(maxx-60,miny+170,'Fire '+st(round(map.m^[hero].armorOxy/rtimer.fps)));
+
+    {    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
+    if miny>0 then line(minx,miny,maxx,miny,red);
+    if maxy<my then line(minx,maxy,maxx,maxy,red);
+    if minx>0 then line(minx,miny,minx,maxy,red);
+    if maxx<mx then line(maxx,miny,maxx,maxy,red);
   end;
  end;
+ if not level.editor then begin
   box(0,0,getmaxx,getmaxy);
   if oxy<100 then
     digit((x1+x2)div 2-20,(y1+y2)div 2+30,round(oxy),'%');
@@ -1181,6 +1309,7 @@ begin
     digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
   if map.m^[hero].freez>0 then
     digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].freez/rtimer.fps),' ');
+ end;
 {  if map.m^[hero].fired>0 then
     digit((x1+x2)div 2-12,(y1+y2)div 2+30,round(map.m^[hero].fired/rtimer.fps),' ');}
 end;
@@ -1441,12 +1570,42 @@ begin
     if map.n^[a].l[c].c and cjump>0 then include(map.m^[hero].key,kjump);
   end;
 end;
-var j,ti,tj:longint;
+var
+  j,ti,tj,k:longint;
 
 begin
   if (ammo<max(1,weapon[weap].input))and(weapon[weap].hit=0) then
     map.m^[hero].takebest(1);
 
+  if (level.death)and(fraglimit=frag) then begin win:=true;exit; end;
+
+  if bot=0 then begin // Only human
+  if shift<>0 then begin
+    dec(shift);
+    if shift=0 then scrmode:=normal else scrmode:=rf.shift;
+  end;
+  if reverse<>0 then begin
+    dec(reverse);
+    if reverse=0 then scrmode:=normal else scrmode:=rf.reverse;
+  end;
+  if cwave<>0 then begin
+    dec(cwave);
+    if cwave=0 then scrmode:=normal else scrmode:=rf.wave;
+  end;
+  if drugs<>0 then begin
+    dec(drugs);
+    if drugs=0 then setpal else begin
+      k:=random(10);
+      port[$3c8]:=0;
+      for i:=0 to 255 do
+      begin
+  (*r*)  port[$3c9]:=pal[(i*4)+2]*k div 4;
+  (*g*)  port[$3c9]:=pal[(i*4)+1]*k div 4;
+  (*b*)  port[$3c9]:=pal[(i*4)+0]*k div 4;
+      end;
+    end;
+  end;
+  end;
   mx:=map.m^[hero].mx;
   my:=map.m^[hero].my;
   dest:=map.m^[hero].dest;
@@ -1540,7 +1699,7 @@ begin
     begin
       curn:=map.getnode(mx,my);
 
-      if abs(seex)<kniferange then wmode:=0
+      if (abs(seex)<kniferange)and((not level.death)or(level.skill=5)) then wmode:=0
       else
       if abs(seex)>128 then wmode:=2 else
          wmode:=1;
@@ -1725,7 +1884,7 @@ begin
  case bul[tip].laser of
  false: begin
    if bul[tip].maxfly=1 then begin
-     if (tip=4)and(dx<0) then
+     if (bul[tip].vis='rocket')and(dx<0) then
       p[rocket2].spritec(mx-ax,my-ay)
      else
       p[bul[tip].fly[1]].spritec(mx-ax,my-ay)
@@ -1734,53 +1893,38 @@ begin
     p[bul[tip].fly[(mx div bul[tip].delfly mod bul[tip].maxfly)+1]].spritec(mx-ax,my-ay);
   end;
   true:begin
-
    fr:=round((1-etime/round(bul[tip].time*mfps/speed))*bul[tip].maxfly)+1;
    if fr>bul[tip].maxfly then
      fr:=bul[tip].maxfly;
 
    tx:=p[bul[tip].fly[fr]].x;
    if range>0 then
-    for i:=1 to range div tx do
+    for i:=0 to range div tx do
       p[bul[tip].fly[fr]].spritec(mx-ax+i*tx,my-ay)
      else
-   for i:=-1 downto range div tx do
+   for i:=0 downto (range+4) div tx do
       p[bul[tip].fly[fr]].spritec(mx-ax+i*tx,my-ay)
   end;
   end;
 end;
-procedure tbul.move;
+
+function tbul.check:boolean;
 var
-  i,ax,ay,sx,sy,l:integer;
-  sdy,sdx: real;
+  r: boolean;
+  i:integer;
+  ax,ay,sx,sy: longint;
 begin
-  case bul[tip].laser of
-  false: begin
-  sdx:=dx; ax:=mx;
-  tobj.move;
-  if (bul[tip].time=0)then begin
-  {dy:=dy+bul[tip].g*speed;
-  ax:=mx; ay:=my;
-  x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
-  y:=y+dy*speed; my:=round(y); ly:=my div 8;}
-  if abs(dx)<(0.1) then begin detonate; exit; end;
-  if (dx*sdx<0){ inwall(cwall)} then
-  begin
-    for i:=0 to random(5)+5 do
-      map.randompix(x-sdx,y+dy,0,0,5,5,blow);
-    if bul[tip].staywall>0 then
-      map.inititem(ax,ay,sdx,dy,bul[tip].staywall,false);
-    detonate;
-    exit;
-  end
-  end
-  else begin
-{    dy:=dy+bul[tip].g*speed;
-    dy:=dy-map.g*speed;}
-//    tObj.move;
-    if etime>0 then dec(etime);
-    if (etime=0)and(bul[tip].time<>0)then begin detonate; exit; end;
-  end;
+  r:=tobj.check;
+  check:=r;
+  if upr then
+    if (bul[tip].time=0)or bul[tip].walldetonate then begin
+      for i:=0 to random(5)+5 do
+        map.randompix(x{-sdx},y+dy,0,0,5,5,blow);
+      if bul[tip].staywall>0 then
+        map.inititem(x,y,dx,dy,bul[tip].staywall,false);
+      detonate;
+      exit;
+    end;
 
   for i:=0 to maxmon do
    if i<>who then
@@ -1809,13 +1953,29 @@ begin
       exit;
     end;
   end;
+end;
+
+procedure tbul.move;
+var
+  i,ax,ay,sx,sy,l:integer;
+  sdy,sdx: real;
+begin
+  case bul[tip].laser of
+  false: begin
+    sdx:=dx; ax:=mx;
+    tobj.move;
+  begin
+    if (abs(dx)<(0.4))then begin detonate; exit; end;
+    if (bul[tip].time=0)then begin
+      if etime>0 then dec(etime);
+      if (etime=0)and(bul[tip].time<>0) then begin detonate; exit; end;
+    end;
+
   end;
   true: {laser} begin
   if bul[tip].laser and (range=0)then begin
     if dx<0 then l:=-1 else l:=1;
-    repeat
-      lx:=lx+l;
-    until inwall(cwall);
+    while not inwall(cwall) do lx:=lx+l;
     range:=lx*8-mx;
     lx:=mx div 8;
 
@@ -1926,38 +2086,47 @@ procedure tmon.dier;
 begin
   if not life then exit;
   life:=false;
-  if (map.m^[who].hero=0)and(who<>lastwho) then
-      inc(player[map.m^[lastwho].hero].kill);
-    if (hero>0)and(lastwho>0)then
-    begin
+  if (map.m^[who].hero=0)and(dwho>0)and(map.m^[dwho].hero>0) then
+      inc(player[map.m^[dwho].hero].kill) else
+
+  if (map.m^[who].hero<>0)then begin
+    inc(player[map.m^[who].hero].die);
+    if (dwho>0)and(map.m^[dwho].hero>0)and(dwho<>who) then
+      inc(player[map.m^[dwho].hero].frag);
+  end;
+
+{  if (hero>0)and(lastwho>0)then
+  begin
       inc(player[hero].die);
       if who=lastwho then dec(player[hero].frag);
       if (map.m^[who].hero>0)and(who<>lastwho) then
        inc(player[map.m^[lastwho].hero].frag);
-    end;
+    end;}
 end;
 procedure tmon.kill;
 begin
   if not life then exit;
   setcurstate(die,monster[tip].diei.delay);
   giveweapon;
-  dier;
+  dier(dwho);
 end;
 procedure tmon.explode;
 begin
   if not life then exit;
   setcurstate(crash,monster[tip].bombi.delay);
   giveweapon;
-  dier;
+  dier(dwho);
 end;
 procedure tmon.damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
 var
   i:integer;
+  l: boolean;
 begin
   if ax=0 then begin
     ax:=round(x);
     ay:=round(y-getsy*6)
   end;
+  l:=health>0;
 
   if armorhit<>0 then hit:=hit*0.25;
   if armorbomb<>0 then bomb:=bomb*0.25;
@@ -1986,17 +2155,20 @@ begin
    health:=health-hit-bomb
   else
   begin
-    health:=health-(hit+bomb)/5;
-    armor:=armor-(hit+bomb)/3;
-    if armor<0 then armor:=0;
+    health:=health-(hit+bomb)*defence1;
+    armor:=armor-(hit+bomb)*defence2;
+    if armor<0 then begin health:=health+armor/defence2; armor:=0; end;
   end;
+
   if dwho>0 then lastwho:=dwho;
-  if health<=0 then {Kill monster}
+  if (health<=0)and l  then {Kill monster}
   begin
     health:=0;
     clearwall(cwall);
+//    if hero>0 then inc(player[hero].die);
 {    if (dwho>0)and(hero>0) then player[hero].hero:=dwho;}
   end;
+
   if freez=0 then
     setstate(hack,0.1);
   if not barrel then
@@ -2010,9 +2182,9 @@ begin
   for i:=1 to min(32,round((hit+bomb)*5)) do
     map.randompix(ax,ay,dx+adx,dy+ady,5,5,blow);
 
-  if health<=0 then
-    if (bomb>0)or(freez>0) then begin explode; freez:=0; end
-    else kill;
+  if (health<=0)and l then
+    if (bomb>0)or(freez>0) then begin explode(dwho); freez:=0; end
+    else kill(dwho);
 end;
 procedure tmap.randompix;
 begin
@@ -2135,7 +2307,7 @@ end;
       if (oxy=0)and(hero>0) then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,0,who,0,0);end;
     end else
     begin
-      if oxy=0 then oxy:=20;
+      if oxy<30 then oxy:=30;
       if oxy<100 then
         begin
           oxy:=oxy+1; deldam:=round(0.15*mfps/speed);
@@ -2370,7 +2542,6 @@ begin
   end;
 end;
 procedure tmon.checkstep;
-var savex,savey:real;
 begin
   savex:=x; savey:=y;
   x:=x+dx*speed;  mx:=round(x); lx:=mx div 8;
@@ -2430,12 +2601,13 @@ begin
   close(f);
 end;*)
 procedure ted.reload;
-var j:longint;
+var
+  j:longint;
 begin
   for j:=1 to maxt do land.t[j].b:=0;
   for j:=1 to land.maxtt do
    if j+land.ch<=maxallwall then
-     land.t[j].b:=loadbmp(allwall^[j+land.ch]);
+     land.t[j].b:=loadbmp(allwall[j+land.ch]);
 end;
 procedure ted.draw;
 const ddd=60;
@@ -2476,7 +2648,7 @@ begin
        p[it[shift+i].skin[1]].put(i*ddd,scry+12);
      end;
    end;
-   wall:
+   wall,fillwall:
    begin
      for i:=1 to 8 do print(0+100*byte(i>4),scry+i*10-byte(i>4)*40,
      white-30*byte(0<(land.mask and (1 shl (i-1)))),edwallstr[i]);
@@ -2486,7 +2658,7 @@ begin
      for i:=1 to 4 do print(0,scry+i*10,
      white-30*byte(0<(nodes.mask and (1 shl (i-1)))),ednodestr[i]);
    end;}
-   face: with land do
+   face,fillface: with land do
    begin
      for i:=1 to maxtt do
       if (i+ch<=maxallwall)and(t[i].b<>0) then
@@ -2506,7 +2678,9 @@ begin
    if i=cured then
      print(scrx,(i-1)*10,white,edmenustr[i])
    else
-     print(scrx,(i-1)*10,red,edmenustr[i])
+     print(scrx,(i-1)*10,red,edmenustr[i]);
+
+  if drag or drag2 then rectangle(startd.x-map.dx,startd.y-map.dy,endd.x-map.dx,endd.y-map.dy,white);
 end;
 function mo(x1,y1,x2,y2:integer):boolean;
 begin
@@ -2537,14 +2711,20 @@ begin
     men[i]:=level.name[i];
   getlevellist:=menu(level.max,1,title);
 end;
+procedure swapint(var a,b: integer);
+var
+  t: integer;
+begin
+  t:=a; a:=b; b:=t;
+end;
 
 procedure ted.move;
 var
-  i,freex,j:longint;
+  i,freex,j,x1,y1,xp,yp:longint;
   s:string;
   ok:boolean;
 begin
-  reload;
+//  reload;
   if mo(scrx,0,getmaxx,scry)then
   if push then
   begin
@@ -2581,7 +2761,7 @@ begin
            map.initnode(32,32,nodes.mask);
          end;
        end;
-    5: begin scry:=getmaxy-50; what:=face;  end;
+    5: begin scry:=getmaxy-50; what:=face;  reload; end;
     6:  begin scry:=getmaxy-50; what:=wall; end;
     7:  begin scry:=getmaxy-50; what:=mons; end;
     8:  begin scry:=getmaxy-50; what:=items;end;
@@ -2605,37 +2785,36 @@ begin
         wb.print(100,50,'Обои');
         map.wallpaper:=enterfile(map.wallpaper);
     end;
+    23: begin scry:=getmaxy-50; what:=fillface;  reload; end;
+    24: begin scry:=getmaxy-50; what:=fillwall; end;
   end;
  end;
   if not push then
     if fun.editing then fun.editing:=false;
 
   if mo(0,scry,getmaxx,getmaxy)then // Панель управления снизу
+  if not drag then
   begin
    if push then
     case what of
-     wall:begin
+     wall,fillwall:begin
        repeat until not mouse.push;
        i:=(my-scry)div 10;
        if mx>100 then inc(i,4);
        land.mask:=land.mask xor (1 shl (i-1));
      end;
-{     node:begin
-       repeat until not mouse.push;
-       i:=(my-scry)div 10;
-       nodes.mask:=nodes.mask xor (1 shl (i-1));
-     end;}
-     face: with land do
+     face,fillface: with land do
       begin
-        if mx>=(getmaxx-4) then    inc(ch)
+        if mx>=(getmaxx-4) then inc(ch,8)
           else
-        if (mx<=4)and(ch>0) then  dec(ch)
+        if (mx<=4)and(ch>0) then  dec(ch,8)
           else
         for i:=1 to maxtt do if mo(t[i].x-1,t[i].y-1,t[i].x+p[t[i].b].x,t[i].y+p[t[i].b].y) then
         begin
           curname:=p[t[i].b].name;
           cur:=ch+i;
         end;
+        reload;
       end;
      func: with fun do
       begin
@@ -2687,7 +2866,26 @@ begin
              editing:=true;
              f:=map.initf((mx+map.dx),(my+map.dy),8,8,fname[cur].n);
            end;
-       face:
+
+        fillwall,fillface: begin
+          if not drag then begin
+            startd2.x:=mx+map.dx;
+            startd2.y:=my+map.dy;
+            endd2:=startd2;
+            endd:=endd2;
+            startd:=startd2;
+            drag:=true;
+          end else begin
+            endd2.x:=mx+map.dx;
+            endd2.y:=my+map.dy;
+            endd:=endd2;
+            startd:=startd2;
+            if startd.x>endd.x then swapint(startd.x,endd.x);
+            if startd.y>endd.y then swapint(startd.y,endd.y);
+          end;
+        end;
+
+        face:
          begin
            land.cur:=map.addpat(land.curname);
           for i:=0 to p[map.pat[land.cur]].x div 8-1 do
@@ -2735,6 +2933,23 @@ begin
 
      if push2 then
        case what of
+        fillwall,fillface: begin
+          if not drag then begin
+            startd2.x:=mx+map.dx;
+            startd2.y:=my+map.dy;
+            endd2:=startd2;
+            endd:=endd2;
+            startd:=startd2;
+            drag2:=true;
+          end else begin
+            endd2.x:=mx+map.dx;
+            endd2.y:=my+map.dy;
+            endd:=endd2;
+            startd:=startd2;
+            if startd.x>endd.x then swapint(startd.x,endd.x);
+            if startd.y>endd.y then swapint(startd.y,endd.y);
+          end;
+        end;
          func: for i:=0 to maxf do
                 if map.f^[i].enable then
                   begin
@@ -2851,6 +3066,53 @@ begin
       freex:=freex+p[b].x+2;
       if freex>=getmaxx then begin dec(maxtt); break; end;
    end;
+  if not push then
+  case what of
+    fillwall: begin
+      if drag then begin
+      drag:=false;
+      for i:=startd.x div 8 to endd.x div 8 do
+        for j:=startd.y div 8 to endd.y div 8 do
+          map.putwall(i,j,land.mask);
+       end;
+      if drag2 then begin
+      drag2:=false;
+      for i:=startd.x div 8 to endd.x div 8 do
+        for j:=startd.y div 8 to endd.y div 8 do
+          map.putwall(i,j,0);
+       end;
+    end;
+    fillface: begin
+      if drag then begin
+      drag:=false;
+      land.cur:=map.addpat(land.curname);
+      x1:=(startd.x) div 8;
+      y1:=(startd.y) div 8;
+      xp:=(p[map.pat[land.cur]].x+7) div 8;
+      yp:=(p[map.pat[land.cur]].y+7) div 8;
+      for i:=x1 to endd.x div 8 do
+        for j:=y1 to endd.y div 8 do begin
+          map.deputpat((mx+map.dx)div 8+i,(my+map.dy)div 8+j);
+          if ((i-x1)mod xp=0)and((j-y1)mod yp=0)then
+            map.putpat(i,j,land.cur,land.mask);
+        end;
+      end;
+      if drag2 then begin
+      drag2:=false;
+//      land.cur:=map.addpat(land.curname);
+  //    x1:=(startd.x+7) div 8;
+    //  y1:=(startd.y+7) div 8;
+//      xp:=p[map.pat[land.cur]].x div 8;
+//      yp:=p[map.pat[land.cur]].y div 8;
+      for i:=x1 to endd.x div 8 do
+        for j:=y1 to endd.y div 8 do begin
+          map.deputpat((mx+map.dx)div 8+i,(my+map.dy)div 8+j);
+{          if ((i-x1)mod xp=0)and((j-y1)mod yp=0)then
+            map.putpat(i,j,0,0);}
+        end;
+      end;
+    end;
+  end;
 end;
 function tmap.initf(ax,ay,asx,asy,atip:integer):integer;
 var i:longint;
@@ -2942,21 +3204,15 @@ begin
   if (life=0)or((abs(dx)+abs(dy))<0.01*ms) then begin done; exit; end;
   tobj.move;
 end;
-procedure tobj.move;
+
+function tobj.check:boolean;
 var
-  savex,savey:real;
-  x1,y1,x2,y2,i,j,ti,tj:longint;
-  br:boolean;
-  gr: byte;
+  i:integer;
 begin
-  dy:=dy+getg*speed;
-  savex:=x;
-  savey:=y;
-  x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
+  upr:=inwall(cwall);
+  check:=upr;
 
-  gr:=getgrid;
-
-  if (inwall(cFunc)){or(inwall(cButton))} then begin
+  if (inwall(cFunc)) then begin
    with map do
     for i:=0 to maxf do
      if f^[i].enable then
@@ -2966,28 +3222,83 @@ begin
      (mx<=f^[i].x+f^[i].getsx)and
      (my<=f^[i].y+f^[i].getsy)
       then case f^[i].tip of
-{        10: win:=true;
-        11: lose:=true;
-        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
         13{Teleport}: begin
           self.x:=self.x+(f^[i+1].x-f^[i].x);
           self.y:=self.y+(f^[i+1].y-f^[i].y);
-          mx:=round(x); lx:=mx div 8;
-          my:=round(y); ly:=my div 8;
-          savex:=x;
-//          if getg<>0 then dx:=0;
+          self.mx:=round(self.x); self.lx:=self.mx div 8;
+          self.my:=round(self.y); self.ly:=self.my div 8;
+          savex:=self.x;
+          savey:=self.y;
+          upr:=false;
+          check:=true;
+          exit;
         end;
       end;
   end;
+end;
 
-  if inwall(cwall) then
-  begin
+procedure tobj.move;
+var
+  x1,y1,x2,y2,i,j,ti,tj,slx,sly,nlx,nly:longint;
+  br:boolean;
+  gr: byte;
+begin
+  dy:=dy+getg*speed;
+  savex:=x; slx:=lx;
+  savey:=y; sly:=ly;
+
+  gr:=getgrid;
+  upr:=false;
+  br:=false;
+
+  x:=x+dx*speed; mx:=round(x); nlx:=mx div 8;
+  lx:=slx;
+  if dx>0 then
+  while (lx<=nlx)and(not check) do begin
+    inc(lx);
+    x:=x+8;
+    mx:=mx+8;
+  end else
+  while (lx>=nlx)and(not check) do begin
+    dec(lx);
+    x:=x-8;
+    mx:=mx-8;
+  end;
+
+  if not upr then begin
+    x:=savex+dx*speed; mx:=round(x); lx:=mx div 8
+  end
+  else begin
     x:=savex;
     dx:=-dx*getupr;
     dy:=dy*getftr;
     mx:=round(x); lx:=mx div 8;
   end;
-  y:=y+dy*speed; my:=round(y); ly:=my div 8;
+
+  y:=y+dy*speed; my:=round(y); nly:=my div 8;
+  ly:=sly;
+  if dy>0 then
+  while (ly<=nly)and(not check) do begin
+    inc(ly);
+    y:=y+8;
+    my:=my+8;
+  end else
+  while (ly>=nly)and(not check) do begin
+    dec(ly);
+    y:=y-8;
+    my:=my-8;
+  end;
+
+  if not upr then begin
+    y:=savey+dy*speed; my:=round(y); ly:=my div 8
+  end
+  else begin
+    y:=savey;
+    dy:=-dy*getupr;
+    dx:=dx*getftr;
+    my:=round(y); ly:=my div 8;
+  end;
+{  y:=savey+dy*speed; my:=round(y); ly:=my div 8;
   if inwall(cwall) then
   begin
     y:=savey;
@@ -2995,13 +3306,12 @@ begin
     dx:=dx*getftr;
     my:=round(y); ly:=my div 8;
   end;
+ }
   elevator:=false;
   standing:=getstand;
 
-
   x1:=lx-getsx div 2; x2:=x1+getsx-1;  y2:=norm(0,map.y,ly);
-  begin
-   br:=false;
+  br:=false;
 
   if not down then
   for i:=max(0,x1) to min(map.x,x2) do
@@ -3055,7 +3365,6 @@ begin
      br:=true;
    end;
 //   if br then break;
-  end;
 end;
 constructor tobj.newObj; begin {nothing} end;
 function tobj.getsx:integer;
@@ -3596,7 +3905,7 @@ begin
     for j:=-8 to (maxy-miny) div 8+1 do
     if (j+y1<y)and(i+x1<x)then
     if (j+y1>=0)and(i+x1>=0)then
-     if (land[j+y1]^[i+x1].vis<>0)and((land[j+y1]^[i+x1].land and cdeath)=0) then
+     if (land[j+y1]^[i+x1].vis<>0)and((land[j+y1]^[i+x1].land and cOverDraw)<>cOverDraw) then
        p[pat[land[j+y1]^[i+x1].vis]].put(minx+i*8-dx mod 8,miny+j*8-dy mod 8);
 
   for i:=0 to maxpix do  if pix^[i].enable  then pix^[i]. draw(-minx+dx,-miny+dy);
@@ -3609,7 +3918,7 @@ begin
     for j:=-8 to (maxy-miny) div 8+1 do
     if (j+y1<y)and(i+x1<x)then
     if (j+y1>=0)and(i+x1>=0)then
-     if (land[j+y1]^[i+x1].vis<>0)and((land[j+y1]^[i+x1].land and cdeath)>0) then
+     if (land[j+y1]^[i+x1].vis<>0)and((land[j+y1]^[i+x1].land and cOverDraw)=cOverDraw) then
        p[pat[land[j+y1]^[i+x1].vis]].put(minx+i*8-dx mod 8,miny+j*8-dy mod 8);
 end;
 procedure tmap.drawhidden; {40x25}
@@ -3780,23 +4089,25 @@ procedure loadwalls;
 var dat:text;
   k,i:longint;
 begin
-  assign(dat,inidir+'wall.ini');
+{  assign(dat,inidir+'wall.ini');
   reset(dat);
   k:=0;
   while not seekeof(dat) do begin readln(dat); inc(k);end;
-  close(dat);
+  close(dat);}
 
   assign(dat,inidir+'wall.ini');
   reset(dat);
 {  readln(dat,k);}
 {  if debug and(k>10) then k:=10;}
-  getmem(allwall,(k+1)*9);
-  for i:=1 to k do
+//  getmem(allwall,(k+1)*9);
+  i:=0;
+  while not eof(dat) do
   begin
-    readln(dat,allwall^[i]);
+    inc(i);
+    readln(dat,allwall[i]);
 {    loadbmp(allwall^[i]);}
   end;
-  maxallwall:=k;
+  maxallwall:=i;
   close(dat);
 end;
 procedure loadbots(name:string);
@@ -3979,6 +4290,7 @@ var
   ff: file;
   c:array[1..4]of char;
   s:string;
+  i: integer;
 begin
   if a=0 then exit;
   assign(ff,'saves\save'+st(a)+'.sav');
@@ -3989,6 +4301,11 @@ begin
   blockwrite(ff,s,32);
   xorwrite(ff,curmod,32);
   xorwrite(ff,level,sizeof(level));
+  xorwrite(ff,map.x,sizeof(map.x));
+  xorwrite(ff,map.y,sizeof(map.y));
+  for i:=0 to map.y do
+    xorwrite(ff,map.land[i]^,map.x*2);
+
   with map do begin
 {    blockwrite(ff,patname^,sizeof(arrayofstring8));}
     xorwrite(ff,m^,sizeof(arrayofmon));
@@ -4010,6 +4327,7 @@ var
   ff: file;
   c:array[1..4]of char;
   s:string;
+  i: integer;
 begin
   if a=0 then exit;
   assign(ff,'saves\save'+st(a)+'.sav');
@@ -4023,7 +4341,11 @@ begin
   loadmod(s);
 
   xorread(ff,level,sizeof(level));
+  xorread(ff,map.x,sizeof(map.x));
+  xorread(ff,map.y,sizeof(map.y));
   level.load;
+  for i:=0 to map.y do
+    xorread(ff,map.land[i]^,map.x*2);
 
 
   with map do begin
@@ -4048,10 +4370,12 @@ procedure gamemenu;
 var
   i:integer;
 begin
+  setpal;
   for i:=0 to 255 do
     pkey[i]:=false;
 
   level.endgame:=false;
+
   men[1]:='продолжить';
   men[2]:='сохранить';
   men[3]:='загрузить';
@@ -4064,6 +4388,7 @@ begin
   end;
   unpush:=false;
 end;
+
 procedure mainmenu;
 var
   s:string;
@@ -4089,6 +4414,8 @@ begin
          level.editor:=false;
          level.multi:=false;
          level.death:=false;
+         level.maxpl:=1;
+         player[1].bot:=0;
        end;
     2: begin // Cooperative
          modmenu(coop);
@@ -4097,6 +4424,7 @@ begin
          level.skill:=skillmenu;
          first:=level.skill<>0;
          level.cur:=0;editor:=false; multi:=true; death:=false;
+         level.setup;
        end;
     3: begin // DeathMatch
          modmenu(rf.Death);
@@ -4109,33 +4437,19 @@ begin
          begin
            t:=getlevellist('уровень');
            if t<>0 then begin
+              editor:=false; multi:=true; death:=true;
+              reswap:=true;
               level.setup;
               level.cur:=t;
               level.load;
-           end;
+           end else continue;
          end;
-         editor:=false; multi:=true; death:=true;
-         reswap:=true;
        end;
     4: begin loadgame(getsave('загрузить')); if loaded then break; end;
     5: begin debug:=true; editor:=true;first:=true;end;
     0,6: begin endgame:=true; first:=true;end;
    end;
  until level.first;
-end;
-procedure drawwin;
-var t:tnpat;
-begin
-  box(0,0,getmaxx,getmaxy);
-  if putbmpall('win'+st(random(maxwin)+1)) then
-    delay(3);
-end;
-procedure drawlose;
-var t:tnpat;
-begin
-  box(0,0,getmaxx,getmaxy);
-  if putbmpall('lose'+st(random(maxlose)+1)) then
-    delay(3);
 end;
 procedure loadnextlevel;
 var i:longint;
@@ -4154,6 +4468,7 @@ begin
 end;
 procedure loading;
 begin
+  lastinidir:=inidir;
 {  write(load[1]);}  {loadbots('bot.ini');}
 {  write(load[2]);}  loadwalls;
 {  write(load[3]);}  loadbombs;
@@ -4163,115 +4478,31 @@ begin
 {  write(load[7]);}  loadmonsters;
 {  write(load[8]);}  loadfuncs;
 end;
-(******************************** PROGRAM ***********************************)
-var
-  i,j:longint;
-  adelay:longint;
-  lev:string;
+procedure loadmod(a:string);
 begin
-{Main Loading}
-  loadpal2(inidir+'playpal.bmp');
-  loadres;
-  w.load(wadfile);
-  loadbmp('error');
-
-  loadmod('rf.mod');
-  loading;
-
-  wb.load('stbf_',10,1); rb.load('stcfn',5,2);
-
-{  intro:=loadbmp('intro');}
-{  skull1:=loadbmp('skull1'); skull2:=loadbmp('skull2');
-  for i:=1 to 7 do en[i]:=loadbmp('puh'+st(i));}
-
-  rocket2:=loadbmp('rocketl');
-  pnode:=loadbmp('node');  pnodei:=loadbmp('nodei');  pnodeg:=loadbmp('nodeg');
-  for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
-  cur:=loadbmp('cursor');
-{  heiskin[left]:=loadbmp('hai');}
-{   heiskin[right]:=loadbmpr('hai');}
-{Init Screen...}
-
-//  initgraph(res);
-  mx:=640; my:=480;
-  setmode(mx,my);
-  loadfont(inidir,8{'8x8.fnt'});
-  getmaxx:=mx;
-  getmaxy:=my;
-
-  minx:=0;
-  miny:=0;
-  maxx:=getmaxx;
-  maxy:=getmaxy;
-
-{  clear;
-  line(0,0,mx,my,15);
-  screen;
-  readkey;}
-
-  mfps:=30;
-  loadpal(inidir+'playpal.bmp');
-//  if accel<>-1 then setaccelerationmode(accel);
-{Load first level}
-  level.first:=true;
-  map.newObj;
-
- repeat
-  mainmenu;
-  if level.endgame then break;
-  if not level.editor then begin scrx:=getmaxx+1; scry:=getmaxy-50; end
-  else begin scrx:=getmaxx-90; scry:=getmaxy-50; end;
-
-  if level.editor then
-  begin
-    map.create(defx,defy,0,0,defname);
-    ed.land.curname:=allwall^[1];
-    ed.land.mask:=1;
-    ed.what:=face;
-    ed.cool:=true;
-    level.maxpl:=0;
-    map.addpat(allwall^[1]);
-  end;
-
-
-  if (not level.editor)and(not loaded)and not level.death then level.next;
-
-  {Start game}
-  keybuf:='';
-  if (not level.editor)and(not loaded) then drawintro;
-//  GetIntVec($9,@vec);  SetIntVec($9,Addr(keyb));
-  speed:=1;
-  level.endgame:=false;
-
-  time.init(timer.time);
-  rtimer.init(timer.time);
-
-  time.clear;rtimer.clear; time.fps:=mfps;
-  winall:=false;
-  if not level.editor then
-  begin
-    ddx:=1; ddy:=1;  Sensetivity(1,1);
-  end
-  else
-  begin
-    ddx:=6; ddy:=6;    Sensetivity(12,12);
-  end;
-  mousebox(0,0,getmaxx,getmaxy); loaded:=false;
-  unpush:=false;
-  repeat
-    rtimer.move;
-    time.move;  mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
-    case res of
+  level.loadini(a);
+  loadmodfile(a);
+  if upcase(lastinidir)<>upcase(inidir) then loading;
+end;
+procedure movemouse;
+begin
+    mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
+//    add:=7;
+    {    case res of
      0,1: add:=1;
      2,3: add:=7;
-    end;
+    end;}
     lastx:=mx-getmaxx div 2+add;
     lasty:=my-getmaxy div 2;
     if not level.editor {and(rtimer.hod mod 10=0)}then
     begin
       setMouseCursor(getmaxx div 2,getmaxy div 2);
     end;
-
+end;
+procedure movekeyboard;
+var i,j:longint;
+begin
+     keyb;
    for j:=1 to min(3,level.maxpl) do
      for i:=1 to maxkey do
        player[j].key[i]:=pkey[ckey[j,i]];
@@ -4306,11 +4537,13 @@ begin
      for i:=1 to 9 do {ShortCut Weapon}
       if pkey[i+1] then
         map.m^[player[1].hero].fastweap(i);
-
-
      end;
-     keyb;
-    {Manual}
+end;
+procedure passwords;
+var
+  i,j: longint;
+  lev:string;
+begin
     while keypressed do
     begin
       if length(keybuf)=255 then keybuf:=copy(keybuf,2,254);
@@ -4318,6 +4551,7 @@ begin
 
      if pos('debug',keybuf)>0 then begin debug:=not debug;  keybuf:='';end;
      if (pos('lev',keybuf)>0)or(pos('map',keybuf)>0) then begin
+
        j:=pos('lev',keybuf)+3;
        if j>3 then begin
          lev:=copy(keybuf,j,length(keybuf));
@@ -4368,10 +4602,15 @@ begin
               map.m^[player[i].hero].takeitem(j);
            keybuf:='';
           end;
+       if pos('open',keybuf)>0 then begin
+           for i:=0 to maxf do
+             if map.f^[i].tip=15 then map.f^[i].door(i);
+           keybuf:='';
+       end;
        if pos('tank',keybuf)>0 then
          begin
            for i:=1 to level.maxpl do
-            for j:=41 to 60 do
+            for j:=41 to 50 do
               map.m^[player[i].hero].takeitem(j);
            keybuf:='';
         end;
@@ -4382,12 +4621,16 @@ begin
               player[i].win:=true;
          keybuf:='';
        end;
-
-    for i:=1 to level.maxpl do player[i].move;
-    {Move}
-    map.move;
-    level.endgame:=level.endgame or (pkey[1]and unpush);
+end;
+procedure checkwingame;
+var
+  i,j: longint;
+  w: boolean;
+begin
+    level.endgame:=
+      level.endgame or (pkey[1{Esc}]and unpush);
     if not pkey[1] then unpush:=true;
+
     if not level.multi then
       level.endgame:=level.endgame or player[1].lose or player[1].win
      else
@@ -4397,34 +4640,8 @@ begin
     for i:=1 to level.maxpl do
      if player[i].lose then
        player[i].initmulti;
-    if level.editor then ed.move;
-    {Draw}
 
-   if level.editor then clear;
-
-    for i:=1 to level.maxpl do player[i].draw;
-    if level.editor then ed.draw;
-    rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
-    if level.editor then p[cur].sprite(mx,my);
-
-{    for i:=0 to 255 do
-    for j:=0 to 5 do
-      putpixel(i,j,i);}
-    screen;
-//    readkey;
-{    speed:=1;}
-    if time.fps<>0 then speed:=mfps/time.fps*usk;
-    if speed>5 then speed:=5;
-
-    if (not level.editor)and sfps then
-    begin
-      speed:=1;
-      adelay:=round(adelay+(time.fps-mfps)*1000);
-      if adelay<0 then adelay:=0;
-      for i:=0 to adelay do;
-    end;
-
-    if (time.hod mod 50=0)and not level.death and not level.editor then begin
+   if (time.hod mod 50=0)and not level.death and not level.editor then begin
       j:=0;
       for i:=0 to maxmon do
         if (map.m^[i].life)and(map.m^[i].ai)then inc(j);
@@ -4438,8 +4655,16 @@ begin
      case level.multi of
       true:
       begin
-        if player[1].win or player[2].win or player[3].win or player[4].win then
+        w:=false;
+        for i:=1 to level.maxpl do w:=w or player[i].win;
+        if w then
         begin
+          for i:=1 to level.maxpl do
+           if not map.m^[player[i].hero].life then
+             player[i].initmulti;
+
+          setpal;
+          scrmode:=normal;
           level.first:=false;
           drawwin;
           loadnextlevel;
@@ -4457,6 +4682,8 @@ begin
       begin
         if player[1].win then
         begin
+          setpal;
+          scrmode:=normal;
           level.first:=false;
           drawwin;
           loadnextlevel;
@@ -4466,6 +4693,8 @@ begin
         end else
         if player[1].lose then
         begin
+          setpal;
+          scrmode:=normal;
           drawlose;
           reloadelevel;
           level.endgame:=false;
@@ -4480,14 +4709,142 @@ begin
       end;
     end;
    end;
+end;
+procedure checktimer;
+var
+  i,j:longint;
+  adelay:longint;
+begin
+    if time.fps<>0 then speed:=mfps/time.fps*usk;
+    if speed>5 then speed:=5;
+
+    if (not level.editor)and sfps then
+    begin
+      speed:=1;
+      adelay:=round(adelay+(time.fps-mfps)*1000);
+      if adelay<0 then adelay:=0;
+      for i:=0 to adelay do;
+    end;
+end;
+(******************************** PROGRAM ***********************************)
+var
+  i,j:longint;
+begin
+  randomize;
+  firstintro;
+  loadkeys;
+  w.load(wadfile);
+  write('Loading');
+  noImage:=loadbmp('error');
+
+  debug:=upcase(paramstr(1)) ='DEBUG';
+  if (memavail<1000000)and not debug then begin
+    writeln;
+    textattr:=4*16+14;
+    writeln('FATAL ERROR: Не хватает оперативной памяти');
+    textattr:=7;
+    writeln;
+    halt;
+  end;
+
+  hide_cursor;
+{Main Loading}
+  loadpal2(inidir+'playpal.bmp');
+
+  curmod:=''; lastinidir:='';
+  if paramstr(1)='' then
+    loadmod('rf.mod')
+  else
+    loadmod(paramstr(1)+'.mod');
+
+  wb.load('stbf_',10,1); rb.load('stcfn',5,2);
+
+  rocket2:=loadbmp('rocketl');
+  pnode:=loadbmp('node');  pnodei:=loadbmp('nodei');  pnodeg:=loadbmp('nodeg');
+  for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
+  cur:=loadbmp('cursor');
+
+  {Init Screen...}
+
+//  initgraph(res);
+  mx:=640; my:=480;
+  setmode(mx,my); setpal;
+  loadfont(inidir,8);
+  getmaxx:=mx; getmaxy:=my;
+  minx:=0; miny:=0; maxx:=getmaxx; maxy:=getmaxy;
+
+  mfps:=40;
+  level.first:=true;
+  map.newObj;
+
+ repeat
+  mainmenu;
+  if level.endgame then break;
+  if not level.editor then begin scrx:=getmaxx+1; scry:=getmaxy-50; end
+  else begin scrx:=getmaxx-90; scry:=getmaxy-50; end;
+
+  if level.editor then
+  begin
+    map.create(defx,defy,0,0,defname);
+    ed.land.curname:=allwall[1]; ed.land.mask:=1;   ed.what:=face;
+    ed.cool:=true;   level.maxpl:=0;
+    map.addpat(allwall[1]);  winall:=false;
+    ed.drag:=false;
+  end;
+
+
+  if (not level.editor)and(not loaded)and not level.death then level.next;
+
+  {Start game}
+  keybuf:='';
+  if (not level.editor)and(not loaded) then drawintro;
+  speed:=1;
+  level.endgame:=false;
+
+  time.init(timer.time,50);
+  rtimer.init(timer.frame,480);
+
+  time.clear;rtimer.clear; time.fps:=mfps;
+  winall:=false;
+  if not level.editor then begin
+    ddx:=1; ddy:=1;  Sensetivity(1,1);
+  end else begin
+    ddx:=6; ddy:=6;  Sensetivity(12,12);
+  end;
+  mousebox(0,0,getmaxx,getmaxy); loaded:=false;
+  unpush:=false; scrmode:=normal;
+  repeat
+    rtimer.move; time.move;
+    movemouse;
+    movekeyboard;
+    if not level.editor then begin
+      passwords;
+      for i:=1 to level.maxpl do player[i].move;
+      map.move;
+      for i:=1 to level.maxpl do player[i].draw;
+    end else begin
+      clear;
+      ed.move;
+      map.move;
+      ed.draw;
+      p[cur].sprite(mx,my);
+    end;
+    rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
+    case scrmode of
+      normal: screen;
+      shift: screen(10,rtimer.hod);
+      wave:  screen(rtimer.hod);
+      reverse: screenr;
+    end;
+    checktimer;
+    checkwingame;
   until level.endgame or winall;
   winall:=false;
-//  SetIntVec($9,@vec);
  until false;
   {End game}
   closegraph;
   map.done;
-{  outtro;}
-   WEAPONINFO;
-end.
 
+  outtro;
+  WEAPONINFO;
+end.
