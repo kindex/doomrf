@@ -158,6 +158,7 @@ type
      w:array[tmaxweapon]of byte;
      key:set of 1..maxkey;
      bul:array[tmaxbul]of integer;
+     function getmaxhealth: real;
      function getg:real; virtual;
      procedure clearwall(c:byte);
      procedure fillwall(c:byte);
@@ -364,7 +365,6 @@ type
   tlevel=object
     max,cur:integer;
     name:array[0..40]of string[8];
-    savefirst:string[8];
     skill: longint;
     editor,endgame,multi,death,first,rail,look,sniper,reswap:boolean;
     maxpl:integer;
@@ -529,7 +529,8 @@ begin
   curmod:=a;
 
   assign(f,a);
-  reset(f);
+{$i-}  reset(f); {$i+}
+if ioresult<>0 then begin writeln('WARNING: ',a,' file not found !!!'); exit;end;
   while not eof(f) do
   begin
     readln(f,s);
@@ -543,6 +544,9 @@ begin
 {      if s1='intro' then p^[intro].load(s2);}
       if s1='parent' then
         loadmod(s2+'.mod');
+
+      if s1='bmpdir' then
+        dbmp:=s2+'\';
 
       if s1='intro' then
         intro:=loadasbmp(s2);
@@ -570,8 +574,10 @@ begin
         skull1:=loadbmp(s2+'1');
         skull2:=loadbmp(s2+'2');
       end;
+
       if s1='vis' then
         for i:=1 to 7 do en[i]:=loadbmp(s2+st(i));
+
       if s1='freeitem' then
         freeitem:=vl(s2);
       if s1='wintext1' then wintext1:=s2;
@@ -587,7 +593,7 @@ begin
       if s1='death item' then
         multiitem:=vl(s2);
       if copy(s1,1,3)='tip' then
-        bot[vl(copy(s1,4,1))].tip:=vl(s2);
+        tip[vl(copy(s1,4,1))]:=vl(s2);
 
       if s1='start' then startbmp:=s2;
       if s1='win' then winbmp:=s2;
@@ -926,7 +932,6 @@ begin
   until eof(f) or (downcase(name[max])='end');
   close(f);
   dec(max);
-  savefirst:=name[1];
 end;
 procedure initmust(atip,ax,ay,actip:integer; ad:tdest; del:real);
 var i:integer;
@@ -1035,6 +1040,7 @@ begin
   mx:=round(x);
   my:=round(y);
 
+  if tip=13 then
   for i:=max(0,ax div 8) to min(map.x-1,(ax+asx)div 8) do
     for j:=max(0,ay div 8) to min(map.y-1,(ay+asy)div 8) do
      map.land[j]^[i].land:=map.land[j]^[i].land or cfunc;
@@ -1058,12 +1064,21 @@ begin
   armor:=armor+n;
   takearmor:=true;
 end;
+
+function tmon.getmaxhealth: real;
+begin
+  if hero>0 then
+   getmaxhealth:=playdefhealth
+  else
+    getmaxhealth:=monster[tip].health;
+end;
+
 function tmon.takehealth(n:real):boolean;
 begin
-  if health>=monster[tip].health then begin takehealth:=false; exit; end;
+  if health>=getmaxhealth then begin takehealth:=false; exit; end;
   health:=health+n;
   fired:=0;
-  if health>monster[tip].health then health:=monster[tip].health;
+  if health>getmaxhealth then health:=getmaxhealth;
   takehealth:=true;
 end;
 function tmon.takemegahealth(n:real):boolean;
@@ -1074,6 +1089,7 @@ begin
   if health>monster[tip].health*2 then health:=monster[tip].health*2;
   takemegahealth:=true;
 end;
+
 function tmon.takeitem(nn:integer):boolean;
 var
   ok:boolean;
@@ -1229,19 +1245,24 @@ begin
   begin
     p[panel1].sprite(minx,maxy-40);
     if not god then
-     p[en[norm(1,6,round(7-6*health/maxhealth))]].put(minx,maxy-40)
+     if health>0 then
+     p[en[norm(1,6,round(7-6*health/maxhealth))]].spritec(minx+20,maxy-20)
     else
-     p[en[7]].put(minx,maxy-40);
+     p[en[7]].spritec(minx+20,maxy-20)
+    else
+     p[en[8]].spritec(minx+20,maxy-20);
 
-    digit(minx+30,maxy-37,round(health),'%');
-    digit(minx+30,maxy-17,round(armor),' ');
+    digit(minx+31,maxy-37,round(health),'%');
+    if round(armor)<>0 then
+      digit(minx+31,maxy-17,round(armor),' ');
 
     for i:=1 to map.m^[hero].w[weap] do
-      p[weapon[weap].skin].sprite(minx+150+(i-1)*10,maxy-35+(i-1)*10);
+      p[weapon[weap].skin].spritec(minx+165+(i-1)*10,maxy-20+(i-1)*10);
 
-    digit(minx+100,maxy-37,ammo,' ');
+    if ammo>0 then
+      digit(minx+102,maxy-37,ammo,' ');
     if (weapon[-weap].bul<>weapon[weap].bul)and(ammo2>0)then
-      digit(minx+100,maxy-17,ammo2,' ');
+      digit(minx+102,maxy-17,ammo2,' ');
 
     if map.m^[hero].qdamage>0 then
       rb.print(minx+300,maxy-40,'QDamage: '+st(round(map.m^[hero].qdamage/rtimer.fps)));
@@ -1796,7 +1817,7 @@ begin
   begin
     if not ai then dec(bul[weapon[nweap].bul],max(1,weapon[nweap].input));
 
-    for i:=1 to rfunit.bul[weapon[nweap].bul].shot do
+    for i:=1 to rfunit.bul[weapon[nweap].pul].shot do
       map.initbul(x+l*getsx*4,y-monster[tip].h,
       sp*(1+random*per-per/2)+dx,
       sp*(random*per-per/2)+ry-weapon[nweap].speedy
@@ -1810,9 +1831,10 @@ end;
 
 function tmon.takeweap(n:tmaxweapon):boolean;
 begin
-  if w[n]=0 then
+  if (w[n]=0)and(not level.multi) then
     if (weapon[n].cool>=weapon[weap].cool) then weap:=n;
-  if weap=0 then weap:=n;
+
+//  if weap=0 then weap:=n;
   inc(w[n]);
   case (weapon[n].double)of
   true: if w[n]>2 then w[n]:=2;
@@ -1912,16 +1934,18 @@ function tbul.check:boolean;
 var
   r: boolean;
   i:integer;
-  ax,ay,sx,sy: longint;
+  ax,ay,sx,sy,l: longint;
 begin
   r:=tobj.check;
   check:=r;
+  if not enable then exit;
+  if dx>0 then l:=1 else l:=-1;
   if upr then
     if (bul[tip].time=0)or bul[tip].walldetonate then begin
       for i:=0 to random(5)+5 do
-        map.randompix(x{-sdx},y+dy,0,0,5,5,blow);
+        map.randompix(x-8*l{-sdx},y+dy,0,0,5,5,blow);
       if bul[tip].staywall>0 then
-        map.inititem(x,y,dx,dy,bul[tip].staywall,false);
+        map.inititem(x-8*l,y,dx,dy,bul[tip].staywall,false);
       detonate;
       exit;
     end;
@@ -1935,14 +1959,13 @@ begin
      ay:=map.m^[i].my;
      sx:=map.m^[i].getsx*4;
      sy:=map.m^[i].getsy*8;
-    if
-    (mx>=ax-sx)and
+    if (mx>=ax-sx)and
     (my<=ay+1)and
     (mx<=ax+sx)and
     (my>=ay-sy)
     then
     begin
-      map.m^[i].damage(mx,my,
+      map.m^[i].damage(mx{-8*l},my,
       bul[tip].hit*qdamage,
       0,
       bul[tip].fire/speed*mfps*qdamage,
@@ -1964,13 +1987,11 @@ begin
   false: begin
     sdx:=dx; ax:=mx;
     tobj.move;
-  begin
-    if (abs(dx)<(0.4))then begin detonate; exit; end;
-    if (bul[tip].time=0)then begin
+    if (bul[tip].time=0)and(abs(dx)<(0.4))then begin detonate; exit; end;
+    if (bul[tip].time<>0)then begin
       if etime>0 then dec(etime);
       if (etime=0)and(bul[tip].time<>0) then begin detonate; exit; end;
     end;
-
   end;
   true: {laser} begin
   if bul[tip].laser and (range=0)then begin
@@ -2293,18 +2314,23 @@ end;
      if f^[i].enable then
      if (mx>=f^[i].x)and (my>=f^[i].y)and
      (mx<=f^[i].x+f^[i].getsx)and (my<=f^[i].y+f^[i].getsy) then begin
-      if f^[i].tip=12 then damage(0,0,0,100,0,0,hero,0,0);
+      if f^[i].tip=12 then damage(0,0,0,1000,0,0,hero,0,0);
       if f^[i].tip=23 then damage(0,0,0,0,0,10,hero,0,0);
      end;
 
   if deldam=0 then
   begin
+    if god<>0 then
     if inwater then
     begin
       fired:=0; {OXY}
       deldam:=round(0.1*mfps/speed);
       if (oxy>0)and not aqua then oxy:=oxy-1;
-      if (oxy=0)and(hero>0) then begin health:=health-1; oxylife:=oxylife+1; damage(mx,my,0,0,0,0,who,0,0);end;
+      if (oxy=0)and(hero>0) then begin
+        health:=health-1;
+        oxylife:=oxylife+1;
+        damage(mx,my,0,0,0,0,who,0,0);
+      end;
     end else
     begin
       if oxy<30 then oxy:=30;
@@ -3252,7 +3278,7 @@ begin
   br:=false;
 
   x:=x+dx*speed; mx:=round(x); nlx:=mx div 8;
-  lx:=slx;
+  lx:=slx; x:=savex; mx:=round(x);
   if dx>0 then
   while (lx<=nlx)and(not check) do begin
     inc(lx);
@@ -3276,7 +3302,7 @@ begin
   end;
 
   y:=y+dy*speed; my:=round(y); nly:=my div 8;
-  ly:=sly;
+  ly:=sly; y:=savey; my:=round(y);
   if dy>0 then
   while (ly<=nly)and(not check) do begin
     inc(ly);
@@ -4110,6 +4136,7 @@ begin
   maxallwall:=i;
   close(dat);
 end;
+
 procedure loadbots(name:string);
 var
   f:text;
@@ -4151,7 +4178,87 @@ begin
   end;
   close(f);
 end;
+
 procedure botmenu;
+var
+  r,p,i,bots,mans:integer;
+begin
+  men[1]:='Только боты';
+  men[2]:='1 Игрок';
+  men[3]:='2 Игрока';
+  men[4]:='3 Игрока';
+  men[5]:='4 Игрока';
+  r:=menu(5,3,'Игроки');
+  case r of
+    1: p:=0;
+    2: p:=1;
+    3: p:=2;
+    4: p:=3;
+    5: p:=4;
+    0: begin maxallpl:=0; level.maxpl:=0; exit; end;
+  end;
+  fillchar(bot,sizeof(bot),0);
+  for i:=1 to maxplays do begin
+    bot[i].bot:=1;
+    bot[i].tip:=tip[i];
+  end;
+  level.maxpl:=p;
+  for i:=1 to p do
+    bot[i].bot:=0;
+  case p of
+    1: bot[1].scr:=all;
+    2: begin
+      bot[1].scr:=up;
+      bot[2].scr:=down;
+    end;
+    3: begin
+      bot[1].scr:=up;
+      bot[2].scr:=dl;
+      bot[3].scr:=dr;
+    end;
+    4: begin
+      bot[1].scr:=dl;
+      bot[2].scr:=ul;
+      bot[3].scr:=dr;
+      bot[4].scr:=ur;
+    end;
+  end;
+  mans:=level.maxpl;
+  bots:=maxplays-level.maxpl;
+  if level.maxpl>0 then men[1]:='Без ботов'
+  else men[1]:='отмена';
+  men[2]:='1 бот';
+  men[3]:='2 бота';
+  men[4]:='3 бота';
+  men[5]:='4 бота';
+  men[6]:='5 ботов';
+  men[7]:='6 ботов';
+  men[8]:='7 ботов';
+  men[9]:='8 ботов';
+  level.maxpl:=menu(bots+1,bots+1,'Боты')-1;
+  maxallpl:=mans+level.maxpl;
+
+  if mans=0 then
+  case bots of
+    1: bot[1].scr:=all;
+    2: begin
+      bot[1].scr:=up;
+      bot[2].scr:=down;
+    end;
+    3: begin
+      bot[1].scr:=up;
+      bot[2].scr:=dl;
+      bot[3].scr:=dr;
+    end;
+    else begin
+      bot[1].scr:=dl;
+      bot[2].scr:=ul;
+      bot[3].scr:=dr;
+      bot[4].scr:=ur;
+    end;
+  end;
+end;
+{procedure botmenu;
 const
   max=32;
 var
@@ -4175,7 +4282,8 @@ begin
   s:=menu(s,1,'Игроки');
   if s<>0 then
    loadbots(c[s]);
-end;
+end;}
+
 type
   tmod=(single,coop,death);
 procedure modmenu(t: tmod);
@@ -4202,9 +4310,9 @@ begin
     repeat
       readln(f,r);
       r:=upcase(r);
-      if (pos(upcase('single'),r)>0)and(t=single) then ok:=true;
-      if (pos(upcase('cooperative2'),r)>0)and(t=coop) then ok:=true;
-      if (pos(upcase('deathmatch'),r)>0)and(t=death) then ok:=true;
+      if (pos(upcase('single'),r)=1)and(t=single) then ok:=true;
+      if (pos(upcase('coop'),r)=1)and(t=coop) then ok:=true;
+      if (pos(upcase('death'),r)=1)and(t=death) then ok:=true;
     until r='[MAIN]';
     close(f);
 
@@ -4407,30 +4515,31 @@ begin
    case menu(6,1,'') of
     1: begin // Single player game
          modmenu(single);
-         level.name[1]:=level.savefirst;
          level.skill:=skillmenu;
          level.first:=level.skill<>0;
          level.cur:=0;
          level.editor:=false;
          level.multi:=false;
          level.death:=false;
-         level.maxpl:=1;
-         player[1].bot:=0;
+         maxallpl:=1;
+         bot[1].bot:=0;
+         bot[1].scr:=all;
+         level.setup;
        end;
     2: begin // Cooperative
          modmenu(coop);
-         botmenu;
-         level.name[1]:=level.savefirst;
          level.skill:=skillmenu;
+         botmenu;
+         if maxallpl=0 then continue;
          first:=level.skill<>0;
          level.cur:=0;editor:=false; multi:=true; death:=false;
          level.setup;
        end;
     3: begin // DeathMatch
          modmenu(rf.Death);
-         botmenu;
-//         level.name[1]:=level.savefirst;
          level.skill:=skillmenu;
+         botmenu;
+         if maxallpl=0 then continue;
 
          first:=level.skill<>0;
          if first then
@@ -4443,7 +4552,7 @@ begin
               level.cur:=t;
               level.load;
            end else continue;
-         end;
+         end else continue;
        end;
     4: begin loadgame(getsave('загрузить')); if loaded then break; end;
     5: begin debug:=true; editor:=true;first:=true;end;
