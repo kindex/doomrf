@@ -12,8 +12,8 @@ const
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.2.1';
-  data='8.4.2001';
+  version='0.2.2';
+  data='9.4.2001';
   title='DOOM 513: Richtiger Faschist '+version+' ['+data+']';
   company='IVA vision <-=[■]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
@@ -26,6 +26,7 @@ const
   play1=10;
   play2=9;
   bombfire=4;
+  reswapbomb=2;
   barrelbomb=5;
   maxlose=11;
   maxwin=5;
@@ -36,7 +37,7 @@ const
   cstand= 1 shl 1;
   cwater= 1 shl 2;
   clava = 1 shl 3;
-  maxmon=96;
+  maxmon=128;
   maxitem=128;
   maxf=32;
   maxpix=1500;
@@ -50,9 +51,9 @@ const
   maxfname=16;
   scry:integer=19*8;
   scrx:integer=260;
-  maxt=320 div 8;
+  maxt=1600 div 8;
   maxedmenu=10;
-  maxmust=64;
+  maxmust=128;
   defx=200; defy=200; defname='map01';
   maxmonframe=10;
   maxkey=6;
@@ -96,6 +97,7 @@ const
   origlev:tcapt='FLEV';
   blood:tcolor=(m:180; r:12; del: 6{3.5});
   water:tcolor=(m:200; r:8; del:2.5);
+  blow:tcolor=(m:160; r:8; del:2);
   {esc Left Right Fire Jump}
   ckey:array[1..2,1..maxkey]of byte=(
   (1,$4b,$4d,$1d,57,28),
@@ -108,7 +110,7 @@ const
   6-NextWeapon }
 type
    tdest=(left,right);
-   tnpat=0..maxpat;
+{   tnpat=0..maxpat;}
    tmaxmontip=0..maxmontip;
    tmaxweapon=0..maxweapon;
    tmaxbomb=0..maxbomb;
@@ -308,11 +310,12 @@ type
       t:array[1..maxt]of
       record
         x,y:integer;
-        b:tspr;
+        b:tnpat;
        end;
     end;
     procedure draw;
     procedure move;
+    procedure reload;
   end;
   tplayer=object
     enable,win,lose,god:boolean;
@@ -432,7 +435,7 @@ var
   names:array[byte]of string[8];
   allwall:^arrayofstring8;
   mx,my:longint;push,push2:boolean;
-  mfps,skill:longint;
+  mfps,skill,maxallwall:longint;
   debug,editor,endgame,sfps,multi,death,winall,first,rail,look,sniper,reswap:boolean;
   cur,skull1,skull2,intro:tnpat;
   vec:procedure;
@@ -562,7 +565,7 @@ begin
   begin
     player[i].save.health:=health;
     player[i].save.armor:=armor;
-    player[i].save.fired:=fired;
+{    player[i].save.fired:=fired;}
     player[i].save.buhalo:=buhalo;
     player[i].save.vempire:=vempire;
     player[i].save.weap:=weap;
@@ -582,7 +585,7 @@ begin
     player[i].die:=0;
     health:=player[i].save.health;
     armor:=player[i].save.armor;
-    fired:=player[i].save.fired;
+{    fired:=player[i].save.fired;}
     buhalo:=player[i].save.buhalo;
     vempire:=player[i].save.vempire;
     weap:=player[i].save.weap;
@@ -989,7 +992,7 @@ begin
     (map.m^[i].x<(x+s))and
     (map.m^[i].y<(y+s))
     then
-      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,weapon[weap].hit,0,who);
+      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),weapon[weap].hit,0,0,who);
   end;
   delay:=round(weapon[weap].shot*mfps/speed);
   if (not ai)and(bul[weapon[weap].bul]<=0) then exit;
@@ -1070,8 +1073,12 @@ begin
   dy:=dy+bul[tip].g*speed;
   x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
   y:=y+dy*speed; my:=round(y); ly:=my div 8;
-  if inwall then detonate;
-
+  if inwall then
+  begin
+    for i:=0 to random(5)+5 do
+      map.randompix(x-dx,y-dy,0,0,5,5,blow);
+    detonate;
+  end;
   for i:=0 to maxmon do
    if i<>who then
    if map.m^[i].enable then
@@ -1451,9 +1458,17 @@ begin
   end;
   close(f);
 end;*)
+procedure ted.reload;
+var j:longint;
+begin
+  for j:=1 to maxt do land.t[j].b:=0;
+  for j:=1 to land.maxtt do
+   if j+land.ch<=maxallwall then
+     land.t[j].b:=loadbmp(allwall^[j+land.ch]);
+end;
 procedure ted.draw;
 const ddd=60;
-var i:longint;
+var i,j:longint;
 begin
   map.draw;
   if cool then map.drawhidden;
@@ -1496,9 +1511,10 @@ begin
    face: with land do
    begin
      for i:=1 to maxtt do
+      if (i+ch<=maxallwall)and(t[i].b<>0) then
      begin
-       if i+ch=cur then bar(t[i].x-1,t[i].y-1,t[i].x+t[i].b.x,t[i].y+t[i].b.y,white);
-        t[i].b.sprite(t[i].x,t[i].y);
+       if i+ch=cur then bar(t[i].x-1,t[i].y-1,t[i].x+p^[t[i].b].x+1,t[i].y+p^[t[i].b].y,white);
+        p^[t[i].b].sprite(t[i].x,t[i].y);
      end;
    end;
   end;
@@ -1523,6 +1539,7 @@ var
   i,freex,j:longint;
   s:string;
 begin
+  reload;
   if mo(scrx,0,getmaxx,scry)then
   if push then
   begin
@@ -1535,14 +1552,17 @@ begin
      if downcase(s)='yes'then }endgame:=true;
    end;
    2: begin
+        wb.print(50,50,'Записать');
         s:=enterfile(map.name);
         if s<>'' then begin map.name:=s; map.save; end;
       end;
    3: begin
+        wb.print(50,50,'Загрузить');
         s:=enterfile(map.name);
         if s<>'' then map.load(s);
       end;
     4: begin
+         wb.print(50,50,'Новая карта');
          s:='yes';
          readline(100,100,s,s,white,0);
          if downcase(s)='yes'then
@@ -1577,21 +1597,24 @@ begin
         if mx>=(getmaxx-4) then
         begin
           inc(ch);
+          reload;
 {          t[1].b.done;
           for j:=1 to maxt-1 do t[j].b:=t[j+1].b;}
-          for j:=1 to maxt do t[j].b:=loadbmp();
+{          for j:=1 to maxt do t[j].b:=loadbmp(allwall^[j+ch]);}
         end
         else
         if (mx<=4)and(ch>0) then
         begin
           dec(ch);
+          reload;
+{          for j:=1 to maxt do t[j].b:=loadbmp(allwall^[j+ch]);}
 {          t[maxt].b.done;
           for j:=maxt downto 2 do t[j].b:=t[j-1].b; error}
         end
         else
-        for i:=1 to maxtt do if mo(t[i].x-1,t[i].y-1,t[i].x+t[i].b.x,t[i].y+t[i].b.y) then
+        for i:=1 to maxtt do if mo(t[i].x-1,t[i].y-1,t[i].x+p^[t[i].b].x,t[i].y+p^[t[i].b].y) then
         begin
-          curname:=t[i].b.name;
+          curname:=p^[t[i].b].name;
           cur:=ch+i;
         end;
       end;
@@ -1696,14 +1719,14 @@ begin
    for i:=1 to maxt do
     with land,t[i] do
     begin
-      if b.name<>allwall^[ch+i] then
+{      if p^[b].name<>allwall^[ch+i] then
       begin
-        b.load(allwall^[ch+i]);
-      end;
+        p^[b].load(allwall^[ch+i]);
+      end;}
         y:=scry+2;
         x:=freex;
       maxtt:=i;
-      freex:=freex+b.x+2;
+      freex:=freex+p^[b].x+2;
       if freex>=getmaxx then begin dec(maxtt); break; end;
    end;
 end;
@@ -1826,9 +1849,66 @@ begin
      dy:=-dy*getupr;
 {     if dy>0 then dy:=-dy*getupr;{ else dy:=dy-map.g*5;}
      y:=y-1;
+     my:=round(y); ly:=my div 8;
      break;
    end;
 end;
+{procedure tobj.move;
+var
+  savex,savey:real;
+  x1,y1,x2,y2,i,j,sax,say,d,mx8,my8:longint;
+begin
+  standing:=false;
+  dy:=dy+map.g*speed;
+  savex:=x; sax:=mx;
+  savey:=y; sax:=my;
+  x:=x+dx*speed; mx:=round(x); lx:=mx div 8;
+  i:=sax div 8; mx8:=mx div 8;
+  if i<mx8 then d:=1 else d:=-1;
+  repeat
+    lx:=i;
+    if inwall then
+    begin
+      x:=savex;
+      mx:=sax;
+      lx:=mx div 8;
+      dx:=-dx*getupr;
+      dy:=dy*getftr;
+      standing:=true;
+      break;
+    end;
+    i:=i+d;
+  until i=mx8;
+  y:=y+dy*speed; my:=round(y); ly:=my div 8;
+
+  i:=say div 8; my8:=my div 8;
+  if i<my8 then d:=1 else d:=-1;
+
+  repeat
+    ly:=i;
+    if inwall then
+    begin
+      y:=savey;
+      my:=say;
+      ly:=my div 8;
+      dy:=-dy*getupr;
+      dx:=dx*getftr;
+      standing:=true;
+      break;
+    end;
+    i:=i+d;
+  until i=my8;
+
+  x1:=lx-getsx div 2; x2:=x1+getsx-1;
+  y2:=norm(0,map.y,ly);
+  for i:=max(0,x1) to min(map.x,x2) do
+   if map.land[y2]^[i].land and cstand>0 then
+   begin
+     dy:=-dy*getupr;
+     y:=y-1;
+     break;
+   end;
+end;}
 constructor tobj.new; begin {nothing} end;
 function tobj.getsx:integer;
 begin getsx:=1; end;
@@ -1909,7 +1989,7 @@ begin
   dx:=0; dy:=0;
   know:=false; see:=false;
   barrel:=monster[tip].h=0;
-  if barrel then ai:=false;
+  if barrel then begin ai:=false; dest:=left;end;
 end;
 procedure tobj.init(ax,ay,adx,ady:real; af:boolean);
 begin
@@ -1970,11 +2050,13 @@ begin
     land[ay]^[ax].land:=ab;
   end;
 end;
-procedure tmap.deputpat;
+procedure tmap.deputpat(ax,ay:longint);
 var
   i,j,w,i2,j2:longint;
 begin
 {  pset(ax,ay,0,0);}
+  if ax>=x then ax:=x-1;
+  if ay>=y then ay:=y-1;
   for i:=ax downto 0 do
     for j:=ay downto 0 do
     begin
@@ -2323,6 +2405,7 @@ begin
          2: inititem(x,y,curtip,true);
         end;
         tip:=0;
+        initbomb(x,y-16,reswapbomb,0);
       end;
   end
   else
@@ -2421,9 +2504,14 @@ begin
   assign(dat,'wall.dat');
   reset(dat);
   readln(dat,k);
-  if debug and(k>50) then k:=50;
+  if debug and(k>10) then k:=10;
   getmem(allwall,(k+1)*9);
-  for i:=1 to k do readln(dat,allwall^[i]);
+  for i:=1 to k do
+  begin
+    readln(dat,allwall^[i]);
+{    loadbmp(allwall^[i]);}
+  end;
+  maxallwall:=k;
   close(dat);
 end;
 procedure loadmonsters;
@@ -2466,7 +2554,7 @@ begin
     end;
   end;
   close(f);
-  for i:=1 to maxmon do
+  for i:=1 to maxmontip do
   with monster[i] do
    if name<>'' then
    begin
@@ -2919,7 +3007,7 @@ begin
   outtro;
   writeln('Free RAM: ',memavail);
   write('Загрузка');
-{  debug:=true;}
+{  debug:=true;
 {  editor:=true;
 {  sfps:=true;}
 {Main Loading}
@@ -2974,6 +3062,7 @@ begin
     ed.what:=face;
     ed.cool:=true;
     maxpl:=0;
+    map.addpat(allwall^[1]);
   end;
 
 
@@ -3063,7 +3152,6 @@ begin
     if editor then p^[cur].sprite(mx,my);
 
 {    rb.print(30,10,st(byte(1 in map.m^[player[1].hero].w)));}
-
 
     screen;
     speed:=1;
