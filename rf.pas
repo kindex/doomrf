@@ -11,14 +11,6 @@ const
   ms=ppm/30; { meter/sec}
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
-  game='Doom RF';
-  version='0.2.9';
-  data='27.5.2001';
-  title='DOOM 513: Richtiger Faschist '+version+' ['+data+']';
-  company='IVA vision <-=[■]=->';
-  autor='Andrey Ivanov [kIndeX Navigator]';
-  levels='ICE & kindeX';
-  comment='Last Beta *** Freeware *** Special for PROGMEISTARS !';
   levext='.lev';
   mousepl=4;
   playdefitem=2;
@@ -28,8 +20,8 @@ const
   reswapbomb=2;
   barrelbomb=5;
   maxlose=11;
-  maxwin=5;
-  maxstart=3;
+  maxwin=6;
+  maxstart=4;
   maxpmaxx=300;
   maxpmaxy=300;
   cwall = 1 shl 0;  cstand= 1 shl 1;  cwater= 1 shl 2;  clava = 1 shl 3; cshl= 1 shl 4; cshr= 1 shl 5;
@@ -53,7 +45,7 @@ const
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
-  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  '7',  '8' );
+  (  'Стена',  'Ступень',  'Вода',  'Лава',  '<-',  '->',  'Disabled',  'Disabled' );
   ednodestr:array[1..4]of string[16]=
   ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );
   edmenustr:array[1..maxedmenu]of string[16]=
@@ -450,7 +442,7 @@ var
   allwall:^arrayofstring8;
   mx,my,lastx,lasty,add:longint;push,push2,push3:boolean;
   mfps,skill,maxallwall:longint;
-  debug,editor,endgame,multi,death,winall,first,rail,look,sniper,reswap:boolean;
+  editor,endgame,multi,death,winall,first,rail,look,sniper,reswap:boolean;
   cur,skull1,skull2,intro:tnpat;
   vec:procedure;
   maxpl:integer;
@@ -927,8 +919,8 @@ begin
     digit(minx+30,maxy-15,round(armor),' ');
     p^[weapon[weap].skin].sprite(minx+230,maxy-30);
     rb.print(minx+230,maxy-15,st(ammo));
-    if oxy<100 then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(oxy),'%');
-    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
+{    if oxy<100 then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(oxy),'%');
+    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
   end;
   true:
   begin
@@ -940,9 +932,12 @@ begin
     rb.print(maxx-56,miny+66,'Frags:'+st(frag));
     rb.print(maxx-56,miny+74,'Kills:'+st(kill));
     rb.print(maxx-56,miny+82,'Die  :'+st(die));
-    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
+{    if god then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');}
   end;
  end;
+  if oxy<100 then digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(oxy),'%');
+  if map.m^[hero].god>0 then
+    digit(minx+(minx++maxx)div 2-24,miny+(maxy+miny)div 2+30,round(map.m^[hero].god/rtimer.fps),' ');
   box(0,0,getmaxx,getmaxy);
 end;
 procedure tmon.takebest(mode:integer);
@@ -1346,13 +1341,17 @@ end;
 procedure tbul.draw(ax,ay:integer);
 begin
 {  tobj.draw(ax,ay);}
-  if bul[tip].rotate<>0 then
+{  if bul[tip].rotate<>0 then
     p^[bul[tip].fly[1]].putrot(mx-ax,my-ay,cos(x/30),sin(x/30),0.75,0.75)
+  else}
+   if bul[tip].maxfly=1 then begin
+     if (tip=4)and(dx<0) then
+      p^[rocket2].spritec(mx-ax,my-ay)
+     else
+      p^[bul[tip].fly[1]].spritec(mx-ax,my-ay)
+   end
   else
-   if bul[tip].maxfly=1 then
-    p^[bul[tip].fly[1]].spritec(mx-ax,my-ay)
-  else
-    p^[bul[tip].fly[(mx div 32 mod bul[tip].maxfly)+1]].spritec(mx-ax,my-ay);
+    p^[bul[tip].fly[(mx div bul[tip].delfly mod bul[tip].maxfly)+1]].spritec(mx-ax,my-ay);
 end;
 procedure tbul.move;
 var i,ax,ay,sx,sy:integer;
@@ -1490,7 +1489,7 @@ var
 begin
   know:=true;
   if barrel and not life then exit;
-  if god>0 then exit;
+  if god<>0 then exit;
 {  if fired=0 then }
   fired:=fired+coxy;
   if armor=0 then
@@ -1806,7 +1805,7 @@ const ddd=60;
 var i,j:longint;
 begin
   map.draw;
-  if cool then map.drawhidden;
+  if cool or (what=wall) then map.drawhidden;
   for i:=0 to maxf do if map.f^[i].enable then map.f^[i].draw(map.dx,map.dy);
   map.drawnodes;
   case what of
@@ -1870,7 +1869,7 @@ begin
    if i=cured then
      print(scrx,(i-1)*10,white,edmenustr[i])
    else
-     print(scrx,(i-1)*10,not white,edmenustr[i])
+     print(scrx,(i-1)*10,red,edmenustr[i])
 end;
 function mo(x1,y1,x2,y2:integer):boolean;
 begin
@@ -2790,7 +2789,7 @@ begin
     if (j+y1<y)and(i+x1<x)then
     if (j+y1>=0)and(i+x1>=0)then
      if land[j+y1]^[i+x1].land<>0 then
-       rectangle(i*8+1-x2,j*8+1-y2,i*8+6-x2,j*8+6-y2,getcol(land[j+y1]^[i+x1].land));
+       rectangle2(i*8+1-x2,j*8+1-y2,i*8+6-x2,j*8+6-y2,getcol(land[j+y1]^[i+x1].land));
 end;
 procedure tmap.drawnodes;
 var i:integer;
@@ -3482,18 +3481,6 @@ if ioresult<>0 then exit;
   if downcase(b)='on' then sfps:=true;
   close(f);
 end;
-procedure outtro;
-begin
-  writeln('The ',game,' <-> ',version,' [',data,']');
-  writeln('Copyright ',company);
-  writeln('PRG: ',autor);
-  writeln('Levels: ',levels);
-  writeln(comment);
-  writeln;
-  manualinfo;
-  writeln('Меню вниз  : Tab');
-  writeln('*** Если у вас проблемы с графикой - '#13#10'замените число в первой строчке в файле res.ini на 0');
-end;
 {procedure weaponinfo;
 var i:integer;
 begin
@@ -3507,28 +3494,12 @@ begin
      writeln;
    end;
  end;}
-procedure firstintro;
-var i:integer;
-begin
-  clrscr;
-  textattr:=4*16+15;
-  for i:=0 to 79 do mem[segb800:i*2+1]:=textattr;
-  writeln(title:(80-length(title))div 2+length(title));
-  textattr:=7;
-  window(1,2,80,25);
-  outtro;
-  writeln('Free RAM: ',memavail);
-  write('Загрузка');
-end;
 (******************************** PROGRAM ***********************************)
 var
   i,j:longint;
   adelay:longint;
   lev:string;
 begin
-  randomize;
-  firstintro;
-  debug:=upcase(paramstr(1)) ='DEBUG';
 {Main Loading}
   w.load(wadfile);
   p^[0].load('bmp\error.bmp');
@@ -3545,6 +3516,7 @@ begin
   wb.load('stbf_',10,1); rb.load('stcfn',5,2);
   skull1:=loadbmp('skull1'); skull2:=loadbmp('skull2');
   intro:=loadbmp('intro');
+  rocket2:=loadbmp('rocketl');
   pnode:=loadbmp('node');  pnodei:=loadbmp('nodei');  pnodeg:=loadbmp('nodeg');
   for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
   cur:=loadbmp('cursor'); for i:=1 to 7 do en[i]:=loadbmp('puh'+st(i));

@@ -251,11 +251,13 @@ begin
 end;
 procedure tel.assign(var f:file; w:longint);
 begin
+{  if (w>=0)and(w<filesize(f)) then begin}
   system.seek(f,w);
   system.blockread(f,n,4);
   system.blockread(f,l,4);
   system.blockread(f,name,8);
   curpos:=0;
+{  end;}
 end;
 procedure tel.read;
 begin
