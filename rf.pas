@@ -4,7 +4,14 @@
 program RF; {First verion: 27.2.2001}
 uses crt,mycrt,mouse,wads,dos,fpgraph,grx,sprites,rfunit,timer,api,ports;
 const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
+  game='Doom RF';
+  version='1.47';
+  data='1.1.2002';
+  title:string='DOOM 513' {+version+' ['+data+']'};
+  comment='Beta fersion *** Freeware *** For testers and designers';
+  shortintro=game+' ['+version+']';
   menutitle='DOOM 513';
+
   accel:integer=-1;
   mainmod:string='RF';
   runmod:string='RF';
@@ -419,7 +426,7 @@ var
   dminus,dpercent:tnpat;
   allwall: arrayofstring8;
   mx,my,lastx,lasty,add, hod:longint;
-  push,push2,push3,loaded, si:boolean;
+  push,push2,push3,loaded, si, origlevels:boolean;
   mfps,maxallwall:longint;
   cur:tnpat;
   player:array[1..maxplays]of tplayer;
@@ -430,6 +437,39 @@ var
 
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
+procedure outtro;
+var
+  i:integer;
+begin
+  writeln('The ',game,' <-> ',version,' [',data,']');
+  for i:=1 to maxtit do begin
+    gotoxy((80-length(tit[i]))div 2,wherey);
+    writeln(tit[i]);
+  end;
+//  writeln(comment);
+//  writeln;
+{  textattr:=4+8;
+  writeln('Запускйте только RF.BAT !!! (иначе у вас не будет работать клавиатура)');
+  textattr:=7;}
+//  textattr:=14;
+//  writeln('*** Если у вас проблемы с графикой - '
+//   #13#10'замените число в первой строчке в файле res.ini на 0');
+//  textattr:=7;
+//  writeln(':)');
+end;
+procedure firstintro;
+var i:integer;
+begin
+  clrscr;
+  textattr:=4*16+15;
+  for i:=0 to 79 do mem[segb800:i*2+1]:=textattr;
+  writeln(title:(80-length(title))div 2+length(title));
+  textattr:=7;
+  window(1,2,80,25);
+  outtro;
+//  manualinfo;
+//  writeln('Free RAM: ',memavail);
+end;
 function tmon.clever: boolean;
 begin
   clever:=monster[tip].health>200;
@@ -702,6 +742,8 @@ begin
 
       if s1='diskload' then
         diskload:=boolean(s2='true');
+      if s1='origlevels' then
+        origlevels:=boolean(s2='true');
 
       if s1='30fps' then
         sfps:=boolean(s2='true');
@@ -2183,7 +2225,7 @@ begin
      sx:=map.m^[i].getsx*4;   sy:=map.m^[i].getsy*8;
      if (mx>=ax-sx)and(my<=ay)and(mx<=ax+sx)and(my>=ay-sy)then
      begin
-       if (i<>who)or free then begin
+       if (i<>who){or free} then begin
          map.m^[i].damage(mx{-8*l},my,
          bul[tip].hit*qdamage,0,
          bul[tip].fire/speed*mfps*qdamage,
@@ -2195,9 +2237,9 @@ begin
          exit;
        end;
      end
-     else
+{     else
        if (i=who)and(bul[tip].time<>0) then
-         free:=true;
+         free:=true;}
   end;
 end;
 
@@ -2746,10 +2788,13 @@ end;
 end;
 
 procedure tmon.moveai;
-procedure moveseesniper;
+procedure movesee;
 var
   tx,ty,tex, tey, l, sx ,sy, ex,ey:integer;
   d:real;
+  first: boolean;
+begin
+//  if level.sniper then begin moveseesniper; exit; end;
 begin
   key:=[];
   see:=false;
@@ -2762,27 +2807,32 @@ begin
   sx:=tx; sy:=ty;
   ex:=target.x div 8;
   ey:=target.y div 8;
-  see:=true;
+  see:=true; first:=true;
+
+  if (abs(sy-ey)>5)and not level.sniper then see:=false;
+
   tex:=0;  tey:=0;
   if (ty>0)and(ty<map.y) and ((abs(sx-ex)>abs(ey-sy))or not level.sniper)and see then
   repeat
     tex:=tex+l;
-
-   if abs(sx-ex)<>0 then
-      tey:=round(abs(tex)/abs(sx-ex)*(ey-sy));
+    if level.sniper then
+     if abs(sx-ex)<>0 then
+       tey:=round(abs(tex)/abs(sx-ex)*(ey-sy));
 
 
     tx:=sx+tex;
     ty:=sy+tey;
 
-    map.initbomb(tx*8,ty*8,reswapbomb,0);
+    if debug then map.initbomb(tx*8,ty*8,reswapbomb,0);
 
     if (ty<=0)or(ty>=map.y-1)or(tx<=0)or(tx>=map.x-1) then begin
        see:=false;
        break;
     end;
-    if (map.land[ty]^[tx].land and cwall)>0 then begin see:=false; break; end;
-  until (tx=ex)
+    if (map.land[ty]^[tx].land and cwall)>0 then begin
+      if not first then begin see:=false; break; end;
+    end else first:=false;
+  until abs(tx-ex)<=2
   else see:=false;
 
   if onhead(target.x,target.y) then
@@ -2790,38 +2840,8 @@ begin
     see:=true;
   end;
 end;
-procedure movesee;
-var tx,ty,l:integer;
-    d:real;
-begin
-  if level.sniper then begin moveseesniper; exit; end;
-  key:=[];
-  see:=false;
-  case dest of
-   left:  l:=-1;
-   right: l:=1;
-  end;
-  tx:=lx;
-  ty:=ly-2;
-  if abs(target.y-ty*8)<32 then begin
-  if (ty>0)and(ty<map.y)then
-  repeat
-    tx:=tx+l;
-    if (ty<=0)or(ty>=map.y-1)or(tx<=0)or(tx>=map.x-1) then begin
-       break;
-    end;
-    if (abs(target.x-tx*8)<16){and(abs(target.y-ty*8)<32)}then begin
-       see:=true;
-       break;
-     end;
-    if (map.land[ty]^[tx].land and cwall)>0 then begin see:=false; break; end;
-  until false;
- end;
-  if onhead(target.x,target.y) then
-  begin
-    see:=true;
-  end;
 end;
+
 var
   i,j:longint;
   min,d:real;
@@ -4591,9 +4611,9 @@ begin
     for i:=0 to maxitem do if item^[i].enable then item^[i].move;
 
     for i:=0 to maxmon do
-      if m^[i].enable then m^[i].moveai;
-    for i:=0 to maxmon do
       if m^[i].enable then m^[i].fillwall(cwall);
+    for i:=0 to maxmon do
+      if m^[i].enable then m^[i].moveai;
     for i:=0 to maxmon do
       if m^[i].enable then m^[i].move;
     for i:=0 to maxmon do
@@ -5183,8 +5203,11 @@ begin
 //  dbmp:=mainmod+'\BMP\';
   mainmod:=upcase(mainmod);
   runmod:=upcase(runmod);
+  if origlevels then
+  levdir:=runmod+'\Levels\'
+  else
+  levdir:=mainmod+'\Levels\';
 
-  levdir:=runmod+'\Levels\';
   inidir:=runmod+'.\';
   savedir:=runmod+'\Saves\';
 
@@ -5565,19 +5588,12 @@ begin
 
   wb.load('stbf_',10,1); rb.load('stcfn',5,2);
 
-  rocket2:=loadbmp('rocketl');
+//  rocket2:=loadbmp('rocketl');
   pnode:=loadbmp('node');  pnodei:=loadbmp('nodei');  pnodeg:=loadbmp('nodeg');
   for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
   cur:=loadbmp('cursor');
-  botcol[1]:=white;
-  botcol[2]:=yellow;
-  botcol[3]:=green;
-  botcol[4]:=blue;
-  botcol[5]:=red;
-  botcol[6]:=red;
-  botcol[7]:=red;
-  botcol[8]:=red;
-
+  botcol[1]:=white;  botcol[2]:=yellow;  botcol[3]:=green;  botcol[4]:=blue;
+  botcol[5]:=red;  botcol[6]:=red;  botcol[7]:=red;  botcol[8]:=red;
   {Init Screen...}
 
 //  initgraph(res);
@@ -5669,7 +5685,6 @@ begin
   closegraph;
 //  map.done;
 
-  outtro;
+  firstintro;   //  outtro;
   WEAPONINFO;
- writeln(white);
 end.
