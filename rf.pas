@@ -1,10 +1,9 @@
-{$A+,B+,D+,E-,F-,G+,I-,L+,N+,P-,Q-,R-,S-,T-,V+,X+,Y+ Final}
-{ $A+,B+,D+,E-,F+,G+,I+,L+,N+,O+,P+,Q+,R+,S+,T+,V+,X+,Y+ Debug}
+{$A+,B+,D+,E-,F-,G+,I+,L+,N+,P-,Q-,R-,S-,T-,V+,X+,Y+ Final}
 {$M $fff0,0,655360}
+{$ifndef dpmi} Real mode not supported {$endif}
 program RF; {First verion: 27.2.2001}
 uses crt,mycrt,api,mouse,wads,F32MA,dos,grafx,grx,rfunit;
-{$ifndef dpmi} Real mode not supported {$endif}
-const
+const {(C) DiVision: kindeX (Thanks to Zonik & Dark Sirius)}
   accel:integer=-1;
   levelini='level.ini';
   botdir='bots\';
@@ -31,7 +30,6 @@ const
   maxlink=3; {0..3  (4)}
   scry:integer=19*8;  scrx:integer=260;
   maxt=1600 div 8;
-  maxedmenu=12;
   defx=200; defy=200; defname='';
   maxkey=7;
   {esc Left Right Fire Jump}
@@ -54,9 +52,12 @@ const
   (  'Стена',  'Ступень',  'Вода',  'Лава',  '<<',  '>>',  'Function',  'Only in Deathmatch' );
 {  ednodestr:array[1..4]of string[16]=
   ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
+  maxedmenu=12+5+4;
   edmenustr:array[1..maxedmenu]of string[16]=
   (  'Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
-   'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)'  );
+   'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)',
+   'Оружие','Патроны','Аптечки','Интерьер','Колонны',
+   '','Пусто','Стена','Ступень');
 type
   real=single;
   tcapt=array[1..4]of char;
@@ -73,10 +74,10 @@ type
 const
   origlev:tcapt='FL02'; lever00:tcapt='FLEV';
   bot:array[1..4]of tbot=(
-  (tip:10; bot:0; scr:up; name:'Player1'),
-  (tip:9;  bot:1; scr:down;name:'bot2'),
-  (tip:12; bot:1; scr:none;name:'bot3'),
-  (tip:12; bot:1; scr:none;name:'bot4')
+  (tip:10; bot:0; scr:up;   name:'Player1'),
+  (tip:9;  bot:1; scr:down; name:'bot2'),
+  (tip:12; bot:1; scr:none; name:'bot3'),
+  (tip:12; bot:1; scr:none; name:'bot4')
   );
   maxallpl:integer=4;
   blood:tcolor=(m:180; r:12; del: 6{3.5});
@@ -212,6 +213,7 @@ type
     procedure draw(ax,ay,id:integer);
     function getsx:integer; virtual;
     function getsy:integer; virtual;
+    procedure door(id: integer);
   end;
   tbomb=object
      enable: boolean;
@@ -344,6 +346,7 @@ type
   end;
 (******************************** Variables *********************************)
 var
+  men:array[0..100]of string[40];
   pkey:array[byte]of boolean;
   keybuf:string;
   en:array[1..7]of tnpat;
@@ -533,6 +536,20 @@ begin
  end;
   cur:=1; load;
 end;
+
+procedure tf.door;
+var
+  ti,tj,j: integer;
+begin
+  j:=id+1;
+  with map do
+  for ti:=(round(f^[j].x) div 8) to  round(f^[j].x+f^[j].sx) div 8 do
+    for tj:=(round(f^[j].y) div 8) to  round(f^[j].y+f^[j].sy) div 8 do begin
+      land[tj]^[ti].vis:=byte(f^[id].tip=16);
+      land[tj]^[ti].land:=byte(f^[id].tip=16);
+    end;
+end;
+
 procedure tlevel.load;
 var i:integer;
 begin
@@ -554,11 +571,15 @@ begin
   map.done;
   map.load(name[cur]);
 
-  if not death then with map do begin
+  if not death then with map do begin {Disable some wepons and mons in single}
     for i:=0 to maxmon do
       if (m^[i].enable)and(m^[i].ai) then m^[i].checkdeath;
     for i:=0 to maxitem do
       if item^[i].enable then item^[i].checkdeath;
+  end;
+  if death then begin {Open all doors in deathmatch}
+    for i:=0 to maxf do
+      if map.f^[i].tip=15 then map.f^[i].door(i);
   end;
 
  if not first then
@@ -866,8 +887,9 @@ begin
   repeat
     inc(weap);
     if weap>maxweapon then weap:=1;
-  until (weap>maxweapon)or(((bul[weapon[weap].bul]>0)or(weapon[weap].hit>0))and(weap in w));
-{    or((weapon[weap].hit>0)and(weap in w));}
+    if weap in w then
+      if (bul[rfunit.weapon[weap].bul]>0)or(rfunit.weapon[weap].hit>0)then break;
+  until false;
   delay:=round(mfps/speed*0.25);
 end;
 procedure tmon.takeprev;
@@ -876,8 +898,9 @@ begin
   repeat
     dec(weap);
     if weap<0 then weap:=maxweapon;
-  until (weap<0)or(((bul[weapon[weap].bul]>0)or(weapon[weap].hit>0))and(weap in w));;
-{    or((weapon[weap].hit>0)and(weap in w));}
+    if weap in w then
+      if (bul[rfunit.weapon[weap].bul]>0)or(rfunit.weapon[weap].hit>0)then break;
+  until false;
   delay:=round(mfps/speed*0.25);
 end;
 function tmap.getnode(mx,my:longint):integer;
@@ -925,6 +948,16 @@ begin
   seex:=map.m^[f].mx-mx;
   seey:=map.m^[f].my-my;
 end;
+
+
+
+
+
+
+
+
+
+
 procedure tplayer.move;
 var
   i:integer;
@@ -1030,6 +1063,8 @@ begin
     if map.n^[a].l[c].c and cjump>0 then include(map.m^[hero].key,kjump);
   end;
 end;
+var j,ti,tj:integer;
+
 begin
   if (ammo=0)and(weapon[weap].hit=0) then map.m^[hero].takenext;
   mx:=round(map.m^[hero].x);
@@ -1057,7 +1092,8 @@ begin
       then case f^[i].tip of
         10: win:=true;
         11: lose:=true;
-{        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
+        15,16{Open&Close Door}: f^[i].door(i);
+        {        12: map.m^[hero].damage(round(map.m^[hero].x),round(map.m^[hero].y),0,33,0,hero);}
       end;
 
    end;
@@ -1794,6 +1830,76 @@ function mo(x1,y1,x2,y2:integer):boolean;
 begin
   if (mx>=x1)and(my>=y1)and(mx<=x2)and(my<=y2)then mo:=true else mo:=false;
 end;
+function menu(max:integer):integer;
+var
+  ch,hod,enter,i,maxl:integer;
+const
+  x1:integer=80;
+  y1:integer=50;
+  d=22;
+procedure draw;
+var i,j,sx,sy:integer;
+begin
+  clear;
+{  putintro('intro'); Update - }
+  sx:=(getmaxx-p^[intro].x) div 2;
+  sy:=(getmaxy-p^[intro].y) div 2;
+
+  p^[intro].put(sx,sy);
+
+  rb.print(getmaxx div 2-152,getmaxy-10,shortintro);
+
+  for i:=1 to max do
+    wb.print(x1,y1+(i-1)*d,men[i]);
+  if hod mod 90<45 then j:=skull1 else j:=skull2;
+  p^[j].sprite(x1-30,y1-5+(ch-1)*d);
+
+  screen;
+end;
+begin
+  while keypressed do readkey;
+  maxl:=10;
+  for i:=1 to max do
+    if length(men[i])>maxl then maxl:=length(men[i]);
+  x1:=(getmaxx-maxl*15)div 2;
+  if x1<30 then x1:=30;
+  endgame:=false;
+  ch:=1;  hod:=0; enter:=0;
+  repeat
+    inc(hod);
+    y1:=(getmaxy-max*d)div 2;
+    if y1<30 then y1:=30;
+    if (y1+(ch-1)*d>getmaxy-30)then y1:=-(ch-1)*d+getmaxy-30;
+    draw;
+    if keypressed then
+    case crt.readkey of
+      #13: enter:=ch;
+      #27: break;
+      #9:  ch:=(ch)mod max+1;
+      #0:case crt.readkey of
+        #80: if ch<max then inc(ch);
+        #72: if ch>1 then dec(ch);
+       end;
+    end;
+  until enter>0;
+  menu:=enter;
+  while keypressed do readkey;
+end;
+function getlevel:string;
+var
+  s:searchrec;
+  max:integer;
+begin
+  findfirst('*'+levext,anyfile,s);
+  max:=0;  men[max]:='';
+  while doserror=0 do
+  begin
+    inc(max);
+    men[max]:=getfilename(s.name);
+    findnext(s);
+  end;
+  getlevel:=men[menu(max)];
+end;
 procedure ted.move;
 var
   i,freex,j:longint;
@@ -1819,7 +1925,7 @@ begin
       end;
    3: begin
         wb.print(100,50,'Загрузить');
-        s:=enterfile(map.name);
+        s:=getlevel{enterfile(map.name)};
         if s<>'' then map.load(s);
       end;
     4: begin
@@ -1849,6 +1955,14 @@ begin
 {         readline(1,100,map.copy,map.copy,white,0);}
          readline(1,100,map.com,map.com,white,0);
        end;
+    13: begin what:=items; itm.shift:=1; end;
+    14: begin what:=items; itm.shift:=21; end;
+    15: begin what:=items; itm.shift:=40; end;
+    16: begin what:=items; itm.shift:=58; end;
+    17: begin what:=items; itm.shift:=80; end;
+    19: land.mask:=0;
+    20: land.mask:=cwall;
+    21: land.mask:=cstand;
   end;
  end;
   if not push then
@@ -2214,14 +2328,6 @@ begin
           self.x:=self.x+(f^[i+1].x-f^[i].x);
           self.y:=self.y+(f^[i+1].y-f^[i].y);
         end;
-        15,16{Open Door}: begin
-          j:=i+1;
-          for ti:=(round(f^[j].x) div 8) to  round(f^[j].x+f^[j].sx) div 8 do
-            for tj:=(round(f^[j].y) div 8) to  round(f^[j].y+f^[j].sy) div 8 do begin
-              land[tj]^[ti].vis:=byte(f^[i].tip=16);
-              land[tj]^[ti].land:=byte(f^[i].tip=16);
-            end;
-        end;
       end;
   end;
 
@@ -2365,6 +2471,7 @@ begin
   barrel:=monster[tip].h=0;
   if barrel then begin ai:=false; dest:=left;end;
   key:=[];
+  delay:=15;
 end;
 procedure tobj.init(ax,ay,adx,ady:real; af:boolean);
 begin
@@ -2889,8 +2996,6 @@ begin
   maxallwall:=k;
   close(dat);
 end;
-var
-  men:array[0..100]of string[40];
 procedure loadbots(name:string);
 var
   f:text;
@@ -2931,61 +3036,6 @@ begin
     end;
   end;
   close(f);
-end;
-function menu(max:integer):integer;
-var
-  ch,hod,enter,i,maxl:integer;
-const
-  x1:integer=80;
-  y1:integer=50;
-  d=22;
-procedure draw;
-var i,j,sx,sy:integer;
-begin
-  clear;
-{  putintro('intro'); Update - }
-  sx:=(getmaxx-p^[intro].x) div 2;
-  sy:=(getmaxy-p^[intro].y) div 2;
-
-  p^[intro].put(sx,sy);
-
-  rb.print(getmaxx div 2-152,getmaxy-10,shortintro);
-
-  for i:=1 to max do
-    wb.print(x1,y1+(i-1)*d,men[i]);
-  if hod mod 90<45 then j:=skull1 else j:=skull2;
-  p^[j].sprite(x1-30,y1-5+(ch-1)*d);
-
-  screen;
-end;
-begin
-  while keypressed do readkey;
-  maxl:=10;
-  for i:=1 to max do
-    if length(men[i])>maxl then maxl:=length(men[i]);
-  x1:=(getmaxx-maxl*15)div 2;
-  if x1<30 then x1:=30;
-  endgame:=false;
-  ch:=1;  hod:=0; enter:=0;
-  repeat
-    inc(hod);
-    y1:=(getmaxy-max*d)div 2;
-    if y1<30 then y1:=30;
-    if (y1+(ch-1)*d>getmaxy-30)then y1:=-(ch-1)*d+getmaxy-30;
-    draw;
-    if keypressed then
-    case crt.readkey of
-      #13: enter:=ch;
-      #27: break;
-      #9:  ch:=(ch)mod max+1;
-      #0:case crt.readkey of
-        #80: if ch<max then inc(ch);
-        #72: if ch>1 then dec(ch);
-       end;
-    end;
-  until enter>0;
-  menu:=enter;
-  while keypressed do readkey;
 end;
 procedure botmenu;
 const
@@ -3051,21 +3101,6 @@ begin
    0,1: endgame:=false;
    2: endgame:=true;
   end;
-end;
-function getlevel:string;
-var
-  s:searchrec;
-  max:integer;
-begin
-  findfirst('*'+levext,anyfile,s);
-  max:=0;  men[max]:='';
-  while doserror=0 do
-  begin
-    inc(max);
-    men[max]:=getfilename(s.name);
-    findnext(s);
-  end;
-  getlevel:=men[menu(max)];
 end;
 procedure mainmenu;
 var s:string;
@@ -3156,6 +3191,19 @@ begin
      writeln;
    end;
  end;}
+procedure weaponinfo;
+var i:integer;
+begin
+  writeln;
+  for i:=0 to maxweapon do
+   with weapon[i] do
+   if name<>'' then
+   begin
+     write(name:16,' - ',damages:6:2);
+     if bomb>0 then write(' / BOMB ',bomb:6:2);
+     writeln;
+   end;
+ end;
 (******************************** PROGRAM ***********************************)
 var
   i,j:longint;
@@ -3164,15 +3212,16 @@ var
 begin
 {Main Loading}
   w.load(wadfile);
+  loadbmp('error');
   loadres;
-  writeln(load[1]);  loadbots(botdir+'bot.ini');
-  writeln(load[2]);  loadwalls;
-  writeln(load[3]);  loadbombs;
-  writeln(load[4]);  loadbullets;
-  writeln(load[5]);  loadweapons;
-  writeln(load[6]);  loaditems;
-  writeln(load[7]);  loadmonsters;
-  writeln(load[8]);  loadfuncs;
+{  write(load[1]);}  loadbots('bot.ini');
+{  write(load[2]);}  loadwalls;
+{  write(load[3]);}  loadbombs;
+{  write(load[4]);}  loadbullets;
+{  write(load[5]);}  loadweapons;
+{  write(load[6]);}  loaditems;
+{  write(load[7]);}  loadmonsters;
+{  write(load[8]);}  loadfuncs;
 
   level.loadini;
 
@@ -3234,6 +3283,7 @@ begin
     case res of
      0,1: add:=1;
      2: add:=7;
+     3: add:=7;
     end;
     lastx:=mx-getmaxx div 2+add;
     lasty:=my-getmaxy div 2;
@@ -3263,22 +3313,26 @@ begin
       keybuf:=keybuf+downcase(readkey);
 
      if pos('debug',keybuf)>0 then begin debug:=not debug;  keybuf:='';end;
-     if pos('lev',keybuf)>0 then
-         begin
-           j:=pos('lev',keybuf)+3;
-           lev:=copy(keybuf,j,length(keybuf));
-           if pos('lev',lev)>0 then
-             keybuf:=copy(keybuf,j,length(keybuf));
-          with level do
-           for i:=1 to max do
-            if lev=downcase(name[i]) then begin cur:=i-1; j:=0; break; end;
-          if j=0 then
-          begin
-           for i:=1 to maxpl do
-              player[i].win:=true;
-            keybuf:='';
-          end;
-        end;
+     if (pos('lev',keybuf)>0)or(pos('map',keybuf)>0) then begin
+       j:=pos('lev',keybuf)+3;
+       if j>3 then begin
+         lev:=copy(keybuf,j,length(keybuf));
+         if pos('lev',lev)>0 then keybuf:=copy(keybuf,j,length(keybuf));
+       end;
+       j:=pos('map',keybuf)+3;
+       if j>3 then begin
+         lev:=copy(keybuf,j,length(keybuf));
+         if pos('map',lev)>0 then keybuf:=copy(keybuf,j,length(keybuf));
+       end;
+
+       with level do
+         for i:=1 to max do
+           if lev=downcase(name[i]) then begin cur:=i-1; j:=0; break; end;
+       if j=0 then begin
+         for i:=1 to maxpl do player[i].win:=true;
+         keybuf:='';
+       end;
+     end;
 
 {      if not reswap then
         if not death then
@@ -3398,6 +3452,6 @@ begin
   {End game}
   closegraph;
   map.done;
-  outtro;
-{  weaponinfo;}
+{  outtro;}
+  weaponinfo;
 end.
