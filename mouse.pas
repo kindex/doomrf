@@ -13,6 +13,7 @@ Var
   eventhappened : Boolean;           {these Vars to use getLastEvent }
   XMotions,YMotions : Word;          {per 8 pixels}
   mouseCursorLevel : Integer;
+  ddx,ddy:longint;
 Procedure initMouse;
 Procedure show;   Procedure hide;
 Function  X:Word; Function  Y:Word;
@@ -72,13 +73,13 @@ Function X : Word;
 begin
   reg.ax := 3;
   callMouse;
-  X := reg.cx div 2;
+  X := reg.cx div ddx;
 end;
 Function Y : Word;
 begin
   reg.ax := 3;
   callMouse;
-  Y := reg.dx;
+  Y := reg.dx div ddy;
 end;
 function push:boolean;
 begin
@@ -112,8 +113,8 @@ Procedure setMouseCursor(x,y : Word);
 begin
   With reg do begin
     ax := 4;
-    cx := x;
-    dx := y; {prepare parameters}
+    cx := x*ddx;
+    dx := y*ddy; {prepare parameters}
     callMouse;
   end; {with}
 end;
@@ -152,6 +153,10 @@ begin
 end;
 Procedure mouseBox(left,top,right,bottom : Word);
 begin
+  left:=left*ddx;
+  right:=right*ddx;
+  top:=top*ddy;
+  bottom:=bottom*ddy;
   if (left > right) then swap(left,right);
   if (top > bottom) then swap(top,bottom); {make sure they are ordered}
   reg.ax := 7;
@@ -165,13 +170,17 @@ begin
 end;
 Procedure Sensetivity(x,y : Word);
 begin
+  x:=x div ddx;
+  y:=y div ddy;
   reg.ax := 15;
   reg.cx := x; {# of mouse motions to horizontal 8 pixels}
   reg.dx := y; {# of mouse motions to vertical 8 pixels}
   callMouse;
-  XMotions := x; YMotions := y; {update global Unit Variables}
+  XMotions := x;
+  YMotions := y; {update global Unit Variables}
 end;
 begin
+   ddx:=1;ddy:=1;
    eventX:=0;   eventY:=0;
    eventHappened := False;
    initMouse;

@@ -23,6 +23,7 @@ type
     findn,error:longint;
     findstr:string;
     cur: tel;
+    loaded:boolean;
     procedure dir;
     procedure find(ss:string);
     procedure writecapt;
@@ -32,6 +33,7 @@ type
     procedure create(ss:string);
     procedure delete(ss:string);
     procedure addfile(ss:string);
+    procedure addasbmp(ss:string);
     procedure assign(ss:string);
     procedure read(var p; s:longint);
     procedure load(s:string);
@@ -42,6 +44,9 @@ type
     function  getel(s:string):integer;
     function  exist(s:string):boolean;
   end;
+var
+  w:twad;
+
 implementation
 var curpos:longint;
 procedure twad.extract;
@@ -74,9 +79,13 @@ end;
 procedure twad.add(mask:string);
 var ss:searchrec;
 begin
+  if not loaded then create(name);
   dos.findfirst(mask,anyfile,ss);
   while doserror=0 do
   begin
+    if pos('.bmp',downcase(ss.name))>0 then
+     addasbmp(ss.name)
+     else
     addfile(ss.name);
     dos.findnext(ss);
   end;
@@ -124,6 +133,7 @@ begin
   system.assign(res,ss);
 {$i-}  system.reset(res,1); {$i+}
   if ioresult<>0 then begin error:=1; writeln(' ******* Не могу найти ',ss,'!!!'); exit;end;
+  if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
   k.l:=filesize(res);
   k.n:=tab;
   ss:=getfilename(ss);
@@ -148,6 +158,64 @@ begin
     blockwrite(f,p^,reads);
     write('.');
   end;
+  dispose(p);
+  system.close(res);
+  writecapt;
+  writeln('Ok');
+end;
+procedure twad.addasbmp(ss:string);
+var
+  res:file;
+  p:^tarray;
+  k:tel;
+  i:integer;
+  reads:word;
+  x,y,dx,dy,ost,t:longint;
+begin
+  system.assign(res,ss);
+{$i-}  system.reset(res,1); {$i+}
+  if ioresult<>0 then begin error:=1; writeln(' ******* Не могу найти ',ss,'!!!'); exit;end;
+  if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
+  seek(res,18);
+  blockread(res,x,4); dx:=0;
+  blockread(res,y,4); dy:=0;
+  seek(res,1078);
+  k.l:=x*y+8;
+  k.n:=tab;
+  ss:=getfilename(ss);
+  if getel(ss)>0 then
+  begin
+    delete(ss);
+  end;
+  write('Добавляю ',ss:10,' в ',name,': ');
+  k.name:=#0#0#0#0#0#0#0#0;
+  for i:=1 to length(ss) do k.name[i]:=ss[i];
+  inc(n);
+  table^[n]:=k;
+  inc(tab,k.l);
+  system.seek(f,tab);
+  blockwrite(f,table^,n*16);
+  seek(f,k.n);
+  new(p);
+  seek(res,1078);
+  case x mod 4 of
+   0: ost:=0;
+   1: ost:=3;
+   2: ost:=2;
+   3: ost:=1;
+  end;
+  for i:=y-1 downto 0 do
+  begin
+    blockread(res,p^[i*x],x);
+    if ost<>0 then
+      blockread(res,t,ost);
+  end;
+
+  blockwrite(f,x ,2);
+  blockwrite(f,y ,2);
+  blockwrite(f,dx,2);
+  blockwrite(f,dy,2);
+  blockwrite(f,p^,x*y);
   dispose(p);
   system.close(res);
   writecapt;
@@ -198,7 +266,7 @@ begin
 end;
 procedure twad.close;
 begin
-  if name='' then exit;
+  if not loaded then exit;
   system.close(F);
 {  freemem(table,n*16);}
   dispose(table);
@@ -252,9 +320,10 @@ end;
 function twad.exist(s:string):boolean;
 var c:longint;
 begin
+  if not loaded then begin exist:=false; exit; end;
   error:=0;
   c:=1;
-  s:=upcase(s);
+  s:=upcase(getfilename(s));
   if pos('.',s)>0 then s:=copy(s,1,pos('.',s)-1);
   while c<=n do
   begin
@@ -293,11 +362,11 @@ begin
    begin
      writeln('Не могу айти файл ',name);
 {     create(name);}
-     name:='';
+     loaded:=false;
      exit;
    end;
   system.blockread(f,capt,4);
-  if c<>capt then begin system.close(f); writeln('Это не IWAD файл');halt;end;
+  if c<>capt then begin system.close(f); writeln(name,'-Это не IWAD файл');halt;end;
   system.blockread(f,n,4);
   system.blockread(f,tab,4);
   system.seek(f,tab);
@@ -305,6 +374,8 @@ begin
 {  getmem(table,n*16);}
   system.blockread(f,table^,16*n);
 {  for i:=1 to n do begin   system.blockread(f,table^[i],16); end;}
+  loaded:=true;
+{  writeln('WAD file loaded!');}
 end;
 procedure twad.dir;
 var i:longint;
