@@ -334,7 +334,7 @@ type
   end;
   tlevel=object
     max,cur:integer;
-    name:array[0..40]of string[8];
+    name:array[0..30]of string[8];
     savefirst:string[8];
     skill: longint;
     editor,endgame,multi,death,first,rail,look,sniper,reswap:boolean;
@@ -347,7 +347,6 @@ type
   end;
 (******************************** Variables *********************************)
 var
-  men:array[0..100]of string[40];
   unpush: boolean;
   pkey:array[byte]of boolean;
   keybuf:string;
@@ -1624,7 +1623,17 @@ begin
   if ai then moveai;
   if kleft in key then runleft;
   if kright in key then runright;
-  if katack in key then atack;
+
+  if delay=0 then
+  if katack in key then begin
+    if not ai then
+    for i:=1 to max(1,weapon[weap].multi)-1 do begin
+      atack;
+      delay:=0;
+    end;
+    atack;
+  end;
+
   if kjump in key then jump;
   if knext in key then takenext;
   if kprev in key then takeprev;
@@ -2003,64 +2012,7 @@ function mo(x1,y1,x2,y2:integer):boolean;
 begin
   if (mx>=x1)and(my>=y1)and(mx<=x2)and(my<=y2)then mo:=true else mo:=false;
 end;
-function menu(max,def:integer; title: string):integer;
-var
-  ch,hod,enter,i,maxl:integer;
-const
-  x1:integer=80;
-  y1:integer=50;
-  d=22;
-procedure draw;
-var i,j,sx,sy:integer;
-begin
-  clear;
-{  putintro('intro'); Update - }
-  sx:=(getmaxx-p^[intro].x) div 2;
-  sy:=(getmaxy-p^[intro].y) div 2;
 
-  p^[intro].put(sx,sy);
-
-{  wb.print(x1,y1+(i-1)*d,men[i]);}
-
-  wb.print(x1,y1-d*2,title);
-
-  for i:=1 to max do
-    wb.print(x1,y1+(i-1)*d,men[i]);
-  if hod mod 90<45 then j:=skull1 else j:=skull2;
-  p^[j].sprite(x1-30,y1-5+(ch-1)*d);
-
-  screen;
-end;
-begin
-  while keypressed do readkey;
-  maxl:=10;
-  for i:=1 to max do
-    if length(men[i])>maxl then maxl:=length(men[i]);
-  x1:=(getmaxx-maxl*15)div 2;
-  if x1<30 then x1:=30;
-  level.endgame:=false;
-  ch:=def;  hod:=0; enter:=0;
-  if (ch<1)or(ch>max)then ch:=1;
-  repeat
-    inc(hod);
-    y1:=(getmaxy-max*d)div 2;
-    if y1<30 then y1:=30;
-    if (y1+(ch-1)*d>getmaxy-30)then y1:=-(ch-1)*d+getmaxy-30;
-    draw;
-    if keypressed then
-    case crt.readkey of
-      #13: enter:=ch;
-      #27: break;
-      #9:  ch:=(ch)mod max+1;
-      #0:case crt.readkey of
-        #80: if ch<max then inc(ch);
-        #72: if ch>1 then dec(ch);
-       end;
-    end;
-  until enter>0;
-  menu:=enter;
-  while keypressed do readkey;
-end;
 function getlevel(title: string):string;
 var
   s:searchrec;
@@ -2799,6 +2751,7 @@ var
   end;
   ver: integer;
 begin
+  log('nodes',sizeof(nodes));
   done;
   name:=s;
   assign(ff,name+levext);
@@ -3544,6 +3497,8 @@ var
   adelay:longint;
   lev:string;
 begin
+  writeln(sizeof(nodes));
+  halt;
 {Main Loading}
   loadres;
   w.load(wadfile);
@@ -3620,8 +3575,7 @@ begin
     rtimer.easymove;time.move;  mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
     case res of
      0,1: add:=1;
-     2: add:=7;
-     3: add:=7;
+     2,3: add:=7;
     end;
     lastx:=mx-getmaxx div 2+add;
     lasty:=my-getmaxy div 2;
