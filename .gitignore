@@ -1,0 +1,17 @@
+# Compiled files
+*.exe
+*.o
+*.ppu
+*.tpu
+*.tpp
+
+# Archives
+*.rar
+
+# IDE
+.idea/
+
+# RF mod assets (large files)
+*/RF/BMP/
+*/RF/*.bmp
+*/RF/*.wav
