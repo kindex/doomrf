@@ -12,12 +12,12 @@ const
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.1.6';
-  data='2.4.2001';
+  version='0.1.7';
+  data='3.4.2001';
   company='IVA vision <-=[■]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
   levels='Pavel Burakov [ICE]';
-  comment='640x400 test';
+  comment='SPR test';
   maxpmaxx=300;
   maxpmaxy=300;
   cwall = 1 shl 0;
@@ -692,7 +692,7 @@ begin
     tip:=map.m^[hero].tip;
     maxhealth:=monster[tip].health;
     ammo:=map.m^[hero].bul[weapon[weap].bul];
-    map.setdelta(round(map.m^[hero].x),round(map.m^[hero].y),(x2-x1) div 2,(y2-y1) div 2);
+    map.setdelta(round(map.m^[hero].x),round(map.m^[hero].y-14),(x2-x1) div 2,(y2-y1) div 2);
   end;
   map.draw;
   if not editor then
@@ -2644,6 +2644,7 @@ var
 begin
   randomize;
   outtro;
+  writeln('Free RAM: ',memavail, ' (Run-time error 203 - there are no free memory)');
   write('Ни сместа');
 {  debug:=true;}
 {  editor:=true;
@@ -2670,6 +2671,7 @@ begin
   heiskin[left]:=loadbmp('hai');
   heiskin[right]:=loadbmpr('hai');
 {Init Screen...}
+  writeln('Free RAM: ',memavail);
   initgraph(res); loadfont('8x8.fnt'); clear; mfps:=30; loadpal('playpal.bmp');
   if accel<>-1 then setaccelerationmode(accel);
   ddx:=6; ddy:=6;
