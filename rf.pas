@@ -12,13 +12,13 @@ const
   ms2=ms/30; { meter/sec2}
   wadfile='513.wad';
   game='Doom RF';
-  version='0.1.8';
-  data='4.4.2001';
+  version='0.1.9';
+  data='6.4.2001';
   company='IVA vision <-=[þ]=->';
   autor='Andrey Ivanov [kIndeX Navigator]';
   levels='Pavel Burakov [ICE] & kindeX';
   comment='Beta 2 *** Freeware **** Special for PROGMEISTARS !';
-  playdefitem=36;
+  playdefitem=1;
   oxysec=10;
   play1=7;
   play2=1;
@@ -2860,7 +2860,6 @@ begin
     rb.print(getmaxx-30,getmaxy-10,st0(round(rtimer.fps),3));
     if editor then p^[cur].sprite(mx,my);
 
-    rb.print(30,10,st(bul[11].maxfly));
     screen;
     speed:=1;
     if time.fps<>0 then speed:=mfps/time.fps;
