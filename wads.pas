@@ -1,4 +1,6 @@
+{$mode tp}
 unit wads;
+
 interface
 uses api,dos,crt;
 type
@@ -46,10 +48,14 @@ type
   end;
 var
   w:twad;
+  p:^tarray;
 
 implementation
+uses ports,sprites,fpgraph;
+
 var curpos:longint;
-procedure twad.extract;
+
+procedure twad.extract(mask,g:string);
 begin
   findfirst(mask);
   while error=0 do
@@ -58,15 +64,24 @@ begin
     findnext;
   end;
 end;
-procedure twad.extractfile;
+procedure twad.extractfile(mask,g:string);
 var
   p:^tarray;
   res:file;
+  b: tbmp;
 begin
+  fillchar(b,sizeof(b),0);
   write('Извлекаю ',mask:12,' в ',mask+g:12);
+  if (upcase(mask)<>'PLAYPAL')
+  and
+  (b.loadwad(mask)) then begin
+    b.save8(mask+g);
+    write(' (as BMP 8 bit) ');
+  end
+  else begin
   getel(mask);
   new(p);
-  if pos('.',mask)=0 then system.assign(res,mask+g) else system.assign(res,mask);
+  if pos('.',mask)=0 then system.assign(res,mask{+g}) else system.assign(res,mask);
 {$i-}  rewrite(res,1); {$i+}
   if ioresult<>0 then begin writeln(' ****** Ошибка создания файла !!!'); dispose(p);exit;end;
   system.seek(f,cur.n);
@@ -74,6 +89,7 @@ begin
   system.blockwrite(res,p^,cur.l);
   dispose(p);
   system.close(res);
+ end;
   writeln('Ok':5)
 end;
 procedure twad.add(mask:string);
@@ -122,6 +138,7 @@ begin
   truncate(f);
   writeln('Ok');
 end;
+
 procedure twad.addfile(ss:string);
 var
   res:file;
@@ -141,6 +158,7 @@ begin
   begin
     delete(ss);
   end;
+
   write('Добавляю ',ss:10,' в ',name,': ');
   k.name:=#0#0#0#0#0#0#0#0;
   for i:=1 to length(ss) do k.name[i]:=ss[i];
@@ -163,61 +181,47 @@ begin
   writecapt;
   writeln('Ok');
 end;
+
 procedure twad.addasbmp(ss:string);
 var
-  res:file;
-  p:^tarray;
   k:tel;
   i:integer;
   reads:word;
   x,y,dx,dy,ost,t:longint;
+  p: tbmp;
 begin
-  system.assign(res,ss);
-{$i-}  system.reset(res,1); {$i+}
-  if ioresult<>0 then begin error:=1; writeln(' ******* Не могу найти ',ss,'!!!'); exit;end;
+  fillchar(p,sizeof(p),0);
+  p.loadfile(ss);
+  if p.x=0 then
+     begin error:=1; writeln(' ******* Не могу загрузить ',ss,'!!!'); exit;end;
+
   if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
-  seek(res,18);
-  blockread(res,x,4); dx:=0;
-  blockread(res,y,4); dy:=0;
-  seek(res,1078);
-  k.l:=x*y+8;
-  k.n:=tab;
+
+  x:=p.x;  y:=p.y;
+
+  k.l:=x*y+8; k.n:=tab;
   ss:=getfilename(ss);
-  if getel(ss)>0 then
-  begin
+  if getel(ss)>0 then begin
     delete(ss);
   end;
+
   write('Добавляю ',ss:10,' в ',name,': ');
-  k.name:=#0#0#0#0#0#0#0#0;
-  for i:=1 to length(ss) do k.name[i]:=ss[i];
+  k.name:=#0#0#0#0#0#0#0#0; for i:=1 to length(ss) do k.name[i]:=ss[i];
   inc(n);
   table^[n]:=k;
   inc(tab,k.l);
   system.seek(f,tab);
   blockwrite(f,table^,n*16);
-  seek(f,k.n);
-  new(p);
-  seek(res,1078);
-  case x mod 4 of
-   0: ost:=0;
-   1: ost:=3;
-   2: ost:=2;
-   3: ost:=1;
-  end;
-  for i:=y-1 downto 0 do
-  begin
-    blockread(res,p^[i*x],x);
-    if ost<>0 then
-      blockread(res,t,ost);
-  end;
 
+  seek(f,k.n);
   blockwrite(f,x ,2);
   blockwrite(f,y ,2);
   blockwrite(f,dx,2);
   blockwrite(f,dy,2);
-  blockwrite(f,p^,x*y);
-  dispose(p);
-  system.close(res);
+
+  blockwrite(f,p.bmp^,x*y);
+
+//  dispose(p);
   writecapt;
   writeln('Ok');
 end;
@@ -244,7 +248,7 @@ begin
   i:=getel(upcase(ss));
   if error=0 then cur.assign(f,tab+i*16-16)
 end;
-procedure tel.seek;
+procedure tel.seek(w:longint);
 begin
   if curpos+w>l then w:=l-curpos;
   curpos:=w;
@@ -252,6 +256,7 @@ end;
 procedure tel.assign(var f:file; w:longint);
 begin
 {  if (w>=0)and(w<filesize(f)) then begin}
+//  writeln(name,': ',w);
   system.seek(f,w);
   system.blockread(f,n,4);
   system.blockread(f,l,4);
@@ -259,9 +264,12 @@ begin
   curpos:=0;
 {  end;}
 end;
-procedure tel.read;
+procedure tel.read(var f:file; var p; s:longint);
 begin
-  if curpos+s>l then s:=l-curpos;
+//  if curpos+s>l then s:=l-curpos;
+{  writeln(n);
+  writeln(curpos);}
+
   system.seek(f,n+curpos);
   system.blockread(f,p,s);
   inc(curpos,s);
@@ -277,24 +285,26 @@ end;
 procedure twad.loadpal;
 var
   e:tel;
-  p:array[0..256*3-1]of byte;
+//  p:array[0..256*3-1]of byte;
   i:integer;
 begin
   e.assign(f,tab+getel('PLAYPAL')*16);
-  e.read(f,p,256*3);
-  port[$3c8]:=0;
+//  for i:=0 to 255 do
+//    e.read(f,pal[i*4],3);
+  e.read(f,pal,256*4);
+{  port[$3c8]:=0;
   for i:=0 to 255 do
   begin
-(*r*)  port[$3c9]:=p[(i*3)+0]{ div 4};
-(*g*)  port[$3c9]:=p[(i*3)+1]{ div 4};
-(*b*)  port[$3c9]:=p[(i*3)+2]{ div 4};
-  end;
+(*r*)  port[$3c9]:=pal[(i*3)+0];
+(*g*)  port[$3c9]:=pal[(i*3)+1];
+(*b*)  port[$3c9]:=pal[(i*3)+2];
+  end;}
 end;
-function twad.getel;
+function twad.getel(s:string):integer;
 var i:integer;
 begin
   error:=0;
-  for i:=1 to n do if table^[i].getname=s then
+  for i:=1 to n do if upcase(table^[i].getname)=upcase(s) then
   begin
     getel:=i;
     cur:=table^[i];
@@ -303,7 +313,7 @@ begin
   getel:=0;
   error:=1;
 end;
-function tel.getname;
+function tel.getname:string;
 var
   t:string;
   i:byte;
@@ -313,7 +323,7 @@ begin
   t[0]:=char(i-1);
   getname:=t;
 end;
-procedure twad.findfirst;
+procedure twad.findfirst(s:string);
 begin
   findstr:=upcase(s);
   findn:=1;
@@ -340,7 +350,7 @@ begin
   while findn<=n do
   begin
     if
-    (pos(findstr,upcase(table^[findn].getname))>0)or
+    (pos(upcase(findstr),upcase(table^[findn].getname))>0)or
     (findstr='*')or
     (findstr='*.*')
     then
@@ -377,7 +387,7 @@ begin
   system.blockread(f,table^,16*n);
 {  for i:=1 to n do begin   system.blockread(f,table^[i],16); end;}
   loaded:=true;
-{  writeln('WAD file loaded!');}
+//  writeln('WAD файл загружен успешно (',n,' элементов)');
 end;
 procedure twad.dir;
 var i:longint;
@@ -401,4 +411,6 @@ begin
   writeln('Размер файла ',name,': ',n*16+tab);
   writeln('Элементов: ',n);
 end;
+begin
+  new(p);
 end.

@@ -1,51 +1,21 @@
-{$A+,B+,D+,E-,F-,G+,I+,L+,N+,O-,P-,Q-,R-,S-,T-,V+,X+,Y+ Filan}
-{ $A+,B+,D+,E-,F+,G+,I+,L+,N+,O+,P+,Q+,R+,S+,T+,V+,X+,Y+ Debug}
-{Patch for Grafx 1.3c by IVA vision 30.03.2001 [Andrey Ivanov kindeX]
-Bugs:
-!!! convert2spr: freemem(last,x*y) - error 204 - Stupid Pascal!
-  Many procedures don't work (save)
-  max sprite size = 64K
-  Real mode max resolution = 640x400
-  Protected mode don't run in Win (max res=640x400)
-Fix:
-  Buffer -> screen with 1 visual page
-Overload
-  Putpixel
-  screen       <- SetVisualPage / You may wtite waitretrace before screen
-  initgraph    <- set256mode
-  closegraph
-  loadpal
-  putimage
-  putline
-  putsprite
-  box          <- SetViewPort
-  clear        <- cleardevice
-+
- tBMP tSPR LoadBMP
- getfilename:string[8]
- putbmpall -> disk to screen
- delay(sec:real)
-}
-{$G+}
-{Must be used after graphich (best - last)}
+{ $mode tp}
 unit grx;
 interface
-Uses grafx,gr_vars,crt,wads,gr_8bit,api;
+Uses crt,wads, timer, ports, fpgraph,api,sprites;
 type
   tname=string[16];
 
 const
   res:integer=0;
   bpp=8;
-  dbmp:tname='BMP\';
-  maxpat=1500;
-  red: byte = 4;
+//  maxpat=2000;
+{  red: byte = 4;
   green: byte = 2;
   blue: byte = 1;
   white: byte = 15;
   grey: byte = 7;
-  dark: byte = 8;
-  resolution:array[0..4]of
+  dark: byte = 8;}
+{  resolution:array[0..4]of
    record x,y:longint end=
    (
    (x:320; y:200),
@@ -53,7 +23,7 @@ const
    (x:640; y:400),
    (x:640; y:480),
    (x:800; y:600)
-   );
+   );}
   load:array[1..8]of string[40]=
   (
   #13#10'Боты (bot.ini) ...',
@@ -66,9 +36,8 @@ const
 #13#10'Остальное (func.ini, bitmaps)'
   );
 type
-  tfnt=array[0..255,1..8]of byte;
   tcaption=array[1..4]of char;
-  tnpat=0..maxpat;
+//  tnpat=0..maxpat;
   tarray=array[0..64000]of byte;
   tbitmap=record
      caption:array[1..2]of char; {'BM'}
@@ -84,11 +53,11 @@ type
      XPPM,YPPM : longint; {0}
      ClrUsed, ClrImportant  : longint  {?}
    end;
-  tbmp=object
+{  tbmp=object
     x,y:longint;
     name:string[8];
     bmp: ^tArray;
-{    function load(s:string):boolean;}
+//    function load(s:string):boolean;
     procedure save8(s:string);
     procedure save24(s:string);
     procedure put(ax,ay:longint);
@@ -118,122 +87,74 @@ type
     procedure putrot(ax,ay:longint; r1,r2,r3,r4:real);
     procedure spritec(ax,ay:longint);
     procedure spritesp(ax,ay:longint);
+    procedure spriteo(ax,ay:longint; c:longint);
     procedure save8(s:string);
     procedure done;
-  end;
-  tpat=tspr;
-  arrayoftpat=array[tnpat]of tpat; {текстуры}
-  tscreen=array[0..1200]of ^tarray;
-   ttimer=object
-      hod:longint;  fps:extended;
-      tik:record cur,start:extended; h,m,s,s100:word; end;
-      time:record cur,start:longint; end;
-      procedure clear;
-      procedure move;
-      procedure easymove;
-      procedure gettime;
-      procedure getfps;
-   end;
+  end;}
+//  tpat=tspr;
+//  arrayoftpat=array[tnpat]of tpat; {текстуры}
+//  tscreen=array[0..1200]of ^tarray;
   tfont=object
      vis: string[8];
      c:array[#0..#255]of tnpat;
      d:integer;
      procedure load(av:string; ad,method:integer);
      procedure print(ax,ay:integer; s:string);
+     function width(s:string):integer;
   end;
 var
-  pal:array[0..256*4]of byte;
-  scr: tscreen;
-  diskload: boolean;
+//  scr: tscreen;
   maxx,maxy,minx,miny:integer;
   getmaxx,getmaxy:integer;
-  p: ^arrayoftpat;
-  fnt:^tfnt;
-  cbmp:^tarray;
-  tempdata: ^arrayofspr;
-  tempbmp:  ^tarray;
+//  p: ^arrayoftpat;
+//  cbmp:^tarray;
+//  tempdata: ^arrayofspr;
+//  tempbmp:  ^tarray;
   sfps,winall:boolean;
   wb,rb:tfont;
 
   rocket2,inx,iny: integer;
 
 
-function loadbmp(s:string):integer;
+//function loadbmp(s:string):integer;
 function getfilename(s:string):string;
-procedure putpixel(x,y:integer; c:byte);
-procedure putline(x1,y1,sizex: integer;p : pointer);{draw a horizontal line with image of the pointer p}
-procedure putimage(x,y,dx,dy: longint; var bmp: tarray);
-procedure putsprite(x,y,dx,dy: longint; var bmp: tarray);
 Procedure loadpal(name:string);
-procedure screen;
-procedure initgraph(res:integer);
-procedure closegraph;
+//procedure initgraph(res:integer);
 procedure box(x1,y1,x2,y2:integer);
-procedure clear;
-procedure bar(x1,y1,x2,y2:integer; c:byte);
-procedure print(x,y,c:integer; s:string);
-procedure line(x1,y1,x2,y2:integer; c:byte);
-procedure loadfont(name:string);
+
+//procedure line(x1,y1,x2,y2:integer; c:byte);
 procedure readline(x,y:integer; var str:string; last:string; col:byte; fl:integer);
 procedure rectangle(x1,y1,x2,y2:integer; c:byte);
 procedure rectangle2(x1,y1,x2,y2:integer; c:byte);
-procedure swapb(var a,b:byte);
+//procedure swapb(var a,b:byte);
 function getcolor(r,g,b:longint):byte;
 procedure delay(n:real);
 function putbmpall(s:string):boolean;
 function enterfile(s:string):string;
-procedure manualinfo;
 procedure log(b:string; a:longint);
-procedure loadres;
 function exist(s:string):boolean;
-procedure winallgame;
-function loadbmpr(s:string):tnpat;
+//function loadbmpr(s:string):tnpat;
 (*******************************)implementation(****************************)
 uses rfunit;
 
-function loadbmpr(s:string):tnpat;
-var i:longint;
+{function loadbmpr(s:string):tnpat;
+var
+  i:integer;
 begin
   s:=upcase(s);
   for i:=1 to maxpat do
     if p^[i].x=0 then
     begin
      if p^[i].loadr(dbmp+s+'.bmp') then
-       loadbmpr:=i else loadbmpr:=0;
+       loadbmpr:=i
+     else loadbmpr:=0;
      exit;
     end;
   loadbmpr:=0;
-end;
-procedure winallgame;
-begin
-  clear;
-  putbmpall('intro');
-  rb.print(50,70,'You are winner !');
-  rb.print(70,90,'Ты прошел все комнаты !');
-  screen;
-  delay(10);
-  winall:=true;
-end;
-procedure loadres;
-var f:text;
-   b:string;
-   a: integer;
-begin
-  assign(f,'res.ini');
-{$i-}  reset(f); {$i+}
-if ioresult<>0 then exit;
-  readln(f,res);
-  readln(f,usk); ausk:=usk;
-  readln(f,bloodu);
-  readln(f,b);
-  readln(f,a);
-  diskload:=boolean(a);
-  if downcase(b)='on' then sfps:=true;
-  close(f);
-end;
+end;}
 function exist(s:string):boolean;
 begin
-  exist:=w.exist(s) or fexist(s{+'.bmp'}){or fexist(s+'.bmp')};
+  exist:=w.exist(s) or fexist(s)or fexist(dbmp+s+'.bmp');
 end;
 procedure log(b:string; a:longint);
 var f:text;
@@ -243,21 +164,6 @@ begin
   writeln(f,b,': ',a);
   close(f);
 end;
-procedure manualinfo;
-begin
-  textattr:=15;
-  writeln('Управление : 1(Center) 2(Left)  3(PAD)  4(Mouse)    ');
-  writeln('Вправо     : Right     D        PgDn    Left        ');
-  writeln('Влево      : Left      A        End     Right       ');
-  writeln('Прыжок     : Up        W        Pad 5   Up          ');
-  writeln('Вниз       : Down      S        Ins     Down        ');
-  writeln('Стрелять   : Ctrl      Tab      +       Left Button ');
-  writeln('ПредОружие : Shift     Q        *                   ');
-  writeln('СледОружие : Enter     ~        -       Right Button');
-  writeln('Управление ботами: Z-за мной  X-стоять здесь  C-вольно');
-  writeln('F2 - сохранить  F3 - загрузить');
-  textattr:=7;
-end;
 function enterfile(s:string):string;
 var res:string;
 begin
@@ -265,14 +171,15 @@ begin
   enterfile:=res;
 end;
 procedure delay(n:real);
-var t:ttimer;
+var
+  t:ttimer;
 begin
   while keypressed do readkey;
-  t.clear;
+  t.init(average,0);
   repeat
-    t.gettime;
-  until keypressed or (abs(t.tik.cur-t.tik.start)>n);
-  if keypressed then  readkey;
+    t.move;
+  until keypressed or (abs(t.tik-t.start)>n*18);
+  while keypressed do readkey;
 end;
 function putbmpall(s:string):boolean;
 var
@@ -348,47 +255,7 @@ begin
   end;
   screen;
 end;
-procedure ttimer.clear;
-begin
-  gettime;  time.start:=time.cur;  tik.start:=tik.cur;  hod:=0;
-end;
-procedure ttimer.move;
-begin
-  inc(hod);  gettime;
-  case sfps of
-   false: if hod>=round(fps) then begin getfps; clear;end;
-   true:
-   begin
-     if hod>5 then getfps;
-     if hod=50 then begin getfps; clear;end;
-   end;
- end;
-{  if (hod mod 10=0)and(hod>100)then getfps;}
-{  if (hod>30)then getfps;}
-{  if hod=15 then begin getfps; clear;end;}
-end;
-procedure ttimer.easymove;
-begin
-  inc(hod);  gettime;
-  if hod mod 10=0 then getfps;
-end;
-procedure ttimer.gettime;
-begin
-{$ifndef dpmi}
-  time.cur:=meml[0:$046c];
-{$else}
-  with tik do dos.gettime(h,m,s,s100);
-  with tik do cur:=h*60*60+m*60+s+s100/100;
-{$endif}
-end;
-procedure ttimer.getfps;
-begin
-{$ifndef dpmi}
-  fps:=hod*18/(time.cur-time.start+1);
-{$else}
-  fps:=hod/(tik.cur-tik.start+0.01);
-{$endif}
-end;
+
 function getcolor(r,g,b:longint):byte;
 var i,last:byte;
     min,cur:longint;
@@ -402,7 +269,7 @@ begin
    end;
    getcolor:=last;
 end;
-procedure tspr.convert2spr;{from cbmp^}
+(*procedure tspr.convert2spr;
 const
   fon=0;
 var
@@ -412,10 +279,7 @@ begin
   if spr then exit;
   if x=0 then exit;
   xy:=x*y;
-{  writeln(name);}
   maxdata:=0; maxbmp:=0;
-{ if tempbmp<>nil then new(tempbmp);}
-{  if tempdata<>nil then new(tempdata);}
   for i:=0 to y-1 do
   begin
     j:=0;
@@ -433,17 +297,12 @@ begin
       inc(maxdata);
     until (j+1)>=x;
   end;
-{  writeln(name,': ',x*y);}
   bmp:=nil;
   getmem(bmp,maxbmp);
   move(tempbmp^,bmp^,maxbmp);
-{  dispose(tempbmp);}
   data:=nil;
   getmem(data,maxdata*sizeof(tsprdata));
   move(tempdata^,data^,maxdata*sizeof(tsprdata));
-{  dispose(tempdata);}
-{  writeln(memavail);}
-{  freemem(last,x*y); {ERROR}
   spr:=true;
 end;
 function tspr.loadfile(s:string):boolean;
@@ -494,7 +353,7 @@ begin
     loadwad:=true;
   end else begin x:=0; y:=0; loadwad:=false; end;
 end;
-function tbmp.loadwad;
+function tbmp.loadwad(s:string):boolean;
 var dx,dy:integer;
 begin
   if x>0 then done;
@@ -519,7 +378,7 @@ begin
     write('>');
   end;
 end;}
-function tspr.load;
+function tspr.load(s:string):boolean;
 begin
   done;
 {  writeln(s);}
@@ -587,7 +446,7 @@ begin
     convert2spr;
   end else
    loadr:=false;}
-end;
+end;*)
 procedure rectangle(x1,y1,x2,y2:integer; c:byte);
 var
   i:integer;
@@ -606,17 +465,7 @@ begin
   for i:=y1 to y2 do putpixel(x1,i,c);
 {  for i:=y1 to y2 do putpixel(x2,i,c);}
 end;
-procedure loadfont(name:string);
-var f:file;
-begin
-  if fnt=nil then new(fnt);
-  assign(f,name);
-{$i-}  reset(f,1);{$i+}
-  if ioresult<>0 then exit;
-  blockread(f,fnt^,sizeof(fnt^));
-  close(f);
-end;
-procedure line(x1,y1,x2,y2:integer; c:byte);
+{procedure line(x1,y1,x2,y2:integer; c:byte);
 var dx,dy,a,b,i,j:longint;
 begin
   if
@@ -661,7 +510,7 @@ begin
   else
   if dx=-dy then
   for i:=0 to dx do  putpixel(x1+i,y1-i,c);
-end;
+end;}
 {procedure line(x1,y1,x2,y2:integer; c:byte);
 var i:integer;
 begin
@@ -713,31 +562,7 @@ begin
   str:=s;
   while keypressed do readkey;
 end;
-procedure print(x,y,c:integer; s:string);
-var i,j,k,l:integer;
-begin
- if (y>=miny-8)and(x<maxx)and(y<maxy) then
- begin
-   for k:=1 to length(s) do
-    for i:=1 to 8 do
-     for j:=1 to 8 do
-     if (fnt^[ord(s[k]),j] shr (8-i))and 1=1 then
-       putpixel((x+(k-1)*8+i),(y+j),c);
-  end;
-end;
-procedure bar(x1,y1,x2,y2:integer; c:byte);
-var i,d:integer;
-begin
-  if x1<minx then x1:=minx;
-  if y1<miny then y1:=miny;
-  if x2>maxx then x2:=maxx;
-  if y2>maxy then y2:=maxy;
-  if (x2<x1)or(y2<y1)then exit;
-  d:=x2-x1;
-  for i:=y1 to y2 do
-    fillchar(scr[i]^[x1],d,c);
-end;
-procedure tspr.putrot(ax,ay:longint; r1,r2,r3,r4:real);
+(*procedure tspr.putrot(ax,ay:longint; r1,r2,r3,r4:real);
 begin
   spritec(ax,ay);{error}
 end;
@@ -748,14 +573,7 @@ end;
 procedure tspr.spritesp(ax,ay:longint);
 begin
   sprite(ax-x div 2,ay-y);
-end;
-procedure clear;
-var
-  i:integer;
-begin
-  for i:=0 to getmaxy do
-    fillchar(scr[i]^,getmaxx+1,0);
-end;
+end;*)
 procedure box(x1,y1,x2,y2:integer);
 begin
   if x1<0 then x1:=0;
@@ -763,32 +581,26 @@ begin
   if x2>getmaxx then x2:=getmaxx;
   if y2>getmaxy then x2:=getmaxy;
   minx:=x1; miny:=y1; maxx:=x2; maxy:=y2;
-  setviewport(x1,y1,x2,y2,clipon);
+
+  setviewport(x1,y1,x2,y2{,clipon});
+
 end;
-procedure closegraph;
+
+{procedure initgraph(res:integer);
 var
   i:integer;
 begin
-  for i:=0 to getmaxy do freemem(scr[i],getmaxx+1);
-  grafx.closegraph;
-end;
-procedure initgraph(res:integer);
-var
-  i:integer;
-begin
-  setmode(resolution[res].x,resolution[res].y,bpp);
-  getmaxx:=gr_vars.getmaxx;
-  getmaxy:=gr_vars.getmaxy;
+  setmode(resolution[res].x,resolution[res].y{,bpp});
+
+  getmaxx:=mx;
+  getmaxy:=my;
+
   minx:=0;
   miny:=0;
   maxx:=getmaxx;
   maxy:=getmaxy;
-  for i:=0 to getmaxy do
-  begin
-    getmem(scr[i],getmaxx+1);
-    fillchar(scr[i]^,getmaxx+1,0);
-  end;
 end;
+}
 function getfilename(s:string):string;
 var
   i:integer;
@@ -800,199 +612,6 @@ begin
   until false;
   if pos('.',s)>0 then s:=copy(s,1,pos('.',s)-1);
   getfilename:=s;
-end;
-procedure putpixel(x,y:integer; c:byte);
-begin
-  if (x>=minx)and(y>=miny)and(x<=maxx)and(y<=maxy) then
-     scr[y]^[x]:=c;
-end;
-{draw a horizontal line with image of the pointer p}
-procedure putline(x1,y1,sizex: integer;p : pointer);
-var
-  i2,i3,mempos : word;
-  olx1         : integer;
-label
-  endofproc;
-begin
-  asm
-    mov   cx,sizex
-    mov   ax,x1
-    or    cx,cx
-    jz    endofproc
-    jns   @next
-      neg   cx
-      sub   ax,cx
-    @next:
-    add   ax,actviewport.x1
-    mov   olx1,ax
-    mov   bx,ax
-    add   bx,cx
-    mov   di,y1
-    add   di,actviewport.y1
-    cmp   di,fillviewport.y1
-    jl    endofproc
-    cmp   di,fillviewport.y2
-    jg    endofproc
-    mov   cx,fillviewport.x1
-    mov   dx,fillviewport.x2
-    cmp   ax,dx
-    jge   endofproc
-    cmp   bx,cx
-    jle   endofproc
-    cmp   ax,cx
-    jnl   @next1
-      mov   ax,cx
-    @next1:
-    inc   dx
-    cmp   bx,dx
-    jng   @next2
-      mov   bx,dx
-    @next2:
-    sub   bx,ax
-    mov   sizex,bx
-    sub   ax,actviewport.x1
-    sub   di,actviewport.y1
-    add   di,pageadd
-    mov   bx,ax
-    sub   bx,olx1
-    mov   mempos,bx
-    push  ax
-    push  di
-    call  calcbank
-    mov   i2,ax
-  end;
-    if i2 < i2+word(sizex) then
-   {move2screen(ptr(seg(p^),ofs(p^)+mempos)^,ptr(writeptr,i2)^,putmaxx)}
-  asm
-    mov   ax,mempos
-    mov   di,i2
-    mov   cx,sizex
-    mov   bx,currentmode.writeptr
-    mov   dx,ds
-    lds   si,p
-    add   si,ax
-    mov   es,bx
-    mov   ax,cx
-    cmp   cx,8
-    jb    @start
-    mov   cx,di
-    and   cx,11b
-    jz    @iszero
-    mov   bx,4
-    sub   bx,cx
-    mov   cx,bx
-    rep   movsb
-    sub   ax,bx
-    @iszero:
-    mov   cx,ax
-    @start:
-      shr   cx,2
-      db    0F3h,66h,0A5h{rep movsd}
-      mov   cx,ax
-      and   cx,11b
-      jz    @end
-      rep   movsb
-      @end:
-    mov   ds,dx
-  end
-  else begin
-    i3 := 0-i2;
-    move2screen(ptr(seg(p^),ofs(p^)+mempos)^,ptr(currentmode.writeptr,i2)^,i3);
-    incbank;
-    move2(ptr(seg(p^),ofs(p^)+i3+mempos)^,ptr(currentmode.writeptr,0)^,sizex-i3);
-  end;
-  endofproc:
-end;
-procedure putimage(x,y,dx,dy: longint; var bmp: tarray);
-var
-  sizex,sizey,i,i2,i3,i4,oli2,putmaxx : word;
-  x2,y2                               : integer;
-  switched                            : boolean;
-begin
-  sizex := dx;          sizey := dy;
-  inc(x,actviewport.x1); inc(y,actviewport.y1);
-  x2 := x+sizex;        y2 := y+sizey-1;
-  i4      := 0;
-  if (y > fillviewport.y2) or (y2 < fillviewport.y1) then exit;
-  if (x >= fillviewport.x2) or (x2 < fillviewport.x1) then exit;
-  if x  < fillviewport.x1 then begin
-    inc(i4,fillviewport.x1-x);
-    x       := fillviewport.x1;
-  end;
-  if x2 > fillviewport.x2 then x2 := fillviewport.x2;
-  if y  < fillviewport.y1 then begin
-    inc(i4,sizex*(fillviewport.y1-y));
-    y  := fillviewport.y1;
-  end;
-  if y2 > fillviewport.y2 then y2 := fillviewport.y2;
-  putmaxx := abs(x2-x);  sizey := abs(y2-y);
-  inc(y,pageadd);
-  i2 := calcbank(x-actviewport.x1,y-actviewport.y1);
-  oli2 := i2;
-  switched := false;
-
-   for i := y to y+sizey do begin
-     if i2 < i2+putmaxx then begin
-       if (oli2 > i2)and(not switched) then incbank;
-       move2screen(bmp[i4],ptr(currentmode.writeptr,i2)^,putmaxx);
-       switched := false;
-     end else begin
-       i3 := 0-i2;
-       move2screen(bmp[i4],ptr(currentmode.writeptr,i2)^,i3);
-       incbank;
-       switched := true;
-       move2screen(bmp[i4+i3],ptr(currentmode.writeptr,0)^,putmaxx-i3);
-     end;
-     inc(i4,sizex);
-     oli2 := i2;
-     inc(i2,modeinfoblock.bytesperscanline);
-   end;
-end;
-procedure putsprite(x,y,dx,dy: longint; var bmp: tarray);
-const fon=0;
-var
-  sizex,sizey,i,i2,i3,i4,oli2,putmaxx : word;
-  x2,y2                               : integer;
-  switched                            : boolean;
-begin
-  sizex := dx;          sizey := dy;
-  inc(x,actviewport.x1); inc(y,actviewport.y1);
-  x2 := x+sizex;        y2 := y+sizey-1;
-  i4      := 0;
-  if (y > fillviewport.y2) or (y2 < fillviewport.y1) then exit;
-  if (x >= fillviewport.x2) or (x2 < fillviewport.x1) then exit;
-  if x  < fillviewport.x1 then begin
-    inc(i4,fillviewport.x1-x);
-    x       := fillviewport.x1;
-  end;
-  if x2 > fillviewport.x2 then x2 := fillviewport.x2;
-  if y  < fillviewport.y1 then begin
-    inc(i4,sizex*(fillviewport.y1-y));
-    y  := fillviewport.y1;
-  end;
-  if y2 > fillviewport.y2 then y2 := fillviewport.y2;
-  putmaxx := abs(x2-x);  sizey := abs(y2-y);
-  inc(y,pageadd);
-  i2 := calcbank(x-actviewport.x1,y-actviewport.y1);
-  oli2 := i2;
-  switched := false;
-
-   for i := y to y+sizey do begin
-     if i2 < i2+putmaxx then begin
-       if (oli2 > i2)and(not switched) then incbank;
-       sprite2mem(bmp[i4],ptr(currentmode.writeptr,i2)^,putmaxx,fon);
-       switched := false;
-     end else begin
-       i3 := 0-i2;
-       sprite2mem(bmp[i4],ptr(currentmode.writeptr,i2)^,i3,fon);
-       incbank;
-       switched := true;
-       sprite2mem(bmp[i4+i3],ptr(currentmode.writeptr,0)^,putmaxx-i3,fon);
-     end;
-     inc(i4,sizex);
-     oli2 := i2;
-     inc(i2,modeinfoblock.bytesperscanline);
-   end;
 end;
 Procedure loadpal(name:string);
 var ff:file;
@@ -1055,7 +674,41 @@ begin
   close(f);
   loadfile:=true;
   spr:=true;
-end; *)
+end;*)
+(*procedure tspr.spriteo(ax,ay:longint; c:longint);
+var
+  i,j,tx,ty,l,w:longint;
+begin
+  if c=0 then begin spritesp(ax,ay);exit; end;
+  ax:=ax-x div 2; ay:=ay-y;
+if x=0 then exit;
+  if not spr then tbmp.put(ax,ay)
+  else
+  begin
+    for i:=0 to maxdata-1 do
+    begin
+      ty:=ay+data^[i].y;
+      if ty>maxy then break;
+      if ty<miny then continue;
+      tx:=ax+data^[i].x;
+      l:=data^[i].l;
+      w:=data^[i].w;
+      if (tx+l<minx)or(tx>maxx)then continue;
+      if (tx>=minx)and(tx+l<=maxx)then begin
+        putpixel(tx-1,ty,c);
+        move(bmp^[w],scr[ty,tx],l);
+        putpixel(tx+l+1,ty,c);
+      end
+        else
+      if (tx>=minx)and(tx+l>maxx)then
+        move(bmp^[w],scr[ty,tx],maxx-tx+1)
+        else
+      if (tx<minx){and(tx+l>=minx)}then
+        move(bmp^[w+minx-tx],scr[ty,minx],l-minx+tx);
+      {error}
+    end;
+  end;
+end;
 procedure tspr.sprite(ax,ay:longint);
 var
   i,j,tx,ty,l,w:longint;
@@ -1074,13 +727,13 @@ begin
       w:=data^[i].w;
       if (tx+l<minx)or(tx>maxx)then continue;
       if (tx>=minx)and(tx+l<=maxx)then
-        move(bmp^[w],scr[ty]^[tx],l)
+        move(bmp^[w],scr[ty,tx],l)
         else
       if (tx>=minx)and(tx+l>maxx)then
-        move(bmp^[w],scr[ty]^[tx],maxx-tx+1)
+        move(bmp^[w],scr[ty,tx],maxx-tx+1)
         else
       if (tx<minx){and(tx+l>=minx)}then
-        move(bmp^[w+minx-tx],scr[ty]^[minx],l-minx+tx);
+        move(bmp^[w+minx-tx],scr[ty,minx],l-minx+tx);
       {error}
     end;
   end;
@@ -1117,7 +770,6 @@ begin
   if (capt.caption<>'BM')or(capt.bits<>8)or(capt.compression<>0) then begin close(f);exit; end;
   x:=capt.x;
   y:=capt.y;
-{  writeln(name,': ',x*y);}
   getmem(bmp,x*y);
   case x mod 4 of
     0: ost:=0;
@@ -1125,7 +777,6 @@ begin
     2: ost:=2;
     3: ost:=1;
   end;
-{  seek(f,capt.fmtsize);}
   seek(f,1078);
   for i:=y-1 downto 0 do
   begin
@@ -1143,14 +794,13 @@ begin
 end;
 procedure tbmp.put(ax,ay:longint);
 begin
-{  if x<>0 then putimage(ax,ay,x,y,bmp^);}
   sprite(ax,ay);
 end;
 procedure tbmp.sprite(ax,ay:longint);
 var
   i,j,tx,ty,l,w:longint;
 begin
-  if x<>0 then
+{  if x<>0 then
   begin
     for i:=0 to y-1 do
     begin
@@ -1167,10 +817,9 @@ begin
       if (tx>=minx)and(tx+l>maxx)then
         sprite2mem(bmp^[w],scr[ty]^[tx],maxx-tx+1,0)
         else
-      if (tx<minx){and(tx+l>=minx)}then
+      if (tx<minx)then
         sprite2mem(bmp^[w+minx-tx],scr[ty]^[minx],l-minx+tx,0);
-   { putsprite(ax,ay,x,y,bmp^);}
-  end; end;
+  end; end;}
 end;
 procedure tbmp.done;
 begin
@@ -1178,13 +827,13 @@ begin
   freemem(bmp,x*y);
   name:='';
   x:=0;
-end;
-procedure screen;
+end;*)
+{procedure screen;
 var i:integer;
 begin
    for i:=0 to getmaxy do putline(0,i,getmaxx+1,scr[i]);
-end;
-function loadbmp(s:string):integer;
+end;}
+{function loadbmp(s:string):integer;
 var
   i:integer;
   name:string;
@@ -1205,8 +854,8 @@ begin
       exit;
     end;
   loadbmp:=0;
-end;
-procedure tfont.load;
+end;}
+procedure tfont.load(av:string; ad,method:integer);
 var i:char;
    j:integer;
 begin
@@ -1227,17 +876,34 @@ begin
          c[i]:=loadbmp(upcase(vis+st0(byte(i),3)));
   end;
 end;
-procedure tfont.print;
-var i,mx:integer;
+procedure tfont.print(ax,ay:integer; s:string);
+var
+  i,mx:integer;
 begin
-  s:=upcase(s); mx:=0;
+  s:=upcase(s);
+
+  mx:=0;
   for i:=1 to length(s) do
   if s[i]=' ' then inc(mx,d) else
   begin
-    p^[c[s[i]]].sprite(ax+mx,ay);
-    inc(mx,p^[c[s[i]]].x);
+    p[c[s[i]]].sprite(ax+mx,ay);
+    inc(mx,p[c[s[i]]].x);
   end;
 end;
+function tfont.width(s:string):integer;
+var
+  i,mx:integer;
+begin
+  s:=upcase(s);
 
+  mx:=0;
+  for i:=1 to length(s) do
+  if s[i]=' ' then inc(mx,d) else
+  begin
+//    p^[c[s[i]]].sprite(ax+mx,ay);
+    inc(mx,p[c[s[i]]].x);
+  end;
+  width:=mx;
+end;
 
 end.
