@@ -41,6 +41,7 @@ var
   font8x16:array[byte,0..15]of byte;
   font8x19:array[byte,0..18]of byte;
   pal:array[0..256*4]of byte;
+  blu:array[byte]of byte;
 
 procedure setmode(const ax,ay:xy); // Setting up scree by calling InitGraph
 procedure res2Mode(x, y, maxColor: longint; var driver,mode: smallInt); // Calculates mode
@@ -160,6 +161,12 @@ if ioresult<>0 then exit;
   blue:=getcolor(0,0,255);
   grey:=getcolor(200,200,200);
   dark:=getcolor(100,100,100);
+  yellow:=getcolor(255,255,0);
+  if bpp=1 then
+  for i:=0 to 255 do begin
+    blu[i]:=getcolor(pal[i*4+0]div 2,pal[i*4+1]div 2,pal[i*4+2]);
+  end;
+
 end;
 
 procedure setmode(const ax,ay:xy);

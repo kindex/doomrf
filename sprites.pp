@@ -4,7 +4,6 @@ uses fpgraph;
 const
   maxdots=1024*1024*bpp;
   maxpat=2048;
-  dbmp:string='BMP\';
   dotbmp:string[4]='.bmp';
 type
   tnpat=0..maxpat;
@@ -54,6 +53,7 @@ type
 
     procedure put(ax,ay:xy);      // Ignore black dots
     procedure putsprite(ax,ay:xy);// Put only dots<>black //Wery slow -> use tSpr
+    procedure putrot(ax,ay: xy; al: real);
 
     procedure save8(a:string);
     procedure reverse;
@@ -79,7 +79,10 @@ type
     procedure sprite(ax,ay:xy);
     procedure spritec(ax,ay:longint);
     procedure spritesp(ax,ay:longint);
-    procedure spriteo(ax,ay:xy; c: color);
+
+    procedure spriteo(ax,ay:xy; c: color; r,g,b: byte);
+
+    procedure spritergb(ax,ay:xy; r,g,b: byte);
 
     function loadr(a:string):boolean;
   end;
@@ -101,7 +104,7 @@ function loadbmpr(a:string):tnpat;
 
 
 implementation
-uses api,wads;
+uses api,wads,rfunit;
 
 procedure out(a:char);
 begin
@@ -133,15 +136,15 @@ begin
   if x>0 then done;
 
   name:=s;
-  w.assign(name);
-  w.read(x,2); w.read(y,2);
-  w.read(dx,2); w.read(dy,2);
+  aw.assign(name);
+  aw.read(x,2); aw.read(y,2);
+  aw.read(dx,2); aw.read(dy,2);
 
   {$ifndef high}
   initdata8(x,y);
-  if (w.cur.l=longint(x)*longint(y)+8) then
+  if (aw.w[aw.cw].cur.l=longint(x)*longint(y)+8) then
   begin
-    w.read(bmp^,x*y);
+    aw.read(bmp^,x*y);
     loadwad:=true;
     tag:=ibmp;
   end
@@ -170,14 +173,14 @@ var
   i: longint;
 begin
   error:=0;
-  a:=dbmp+a; // BMP\<a>.bmp
+//  a:=a; // MOD\BMP\<a>.bmp
   for i:=0 to maxpat do
    if (p[i].x>0)and(p[i].equal(a,left)) then begin
      loadbmp:=i; exit; // Image was loaded in past - All OK
    end;
   for i:=0 to maxpat do
    if p[i].tag=none then begin
-     p[i].load(a+'.bmp'); // Loading...
+     p[i].load(a); // Loading...
      if p[i].tag=none then
        loadbmp:=noImage // Image not found
      else loadbmp:=i; // All OK
@@ -191,14 +194,14 @@ var
   i:tnpat;
 begin
    error:=0;
-  a:=dbmp+a; // BMP\<a>.bmp
+//  a:=a; // BMP\<a>.bmp
   for i:=0 to high(i) do
    if p[i].equal(a,right) then begin
      loadbmpr:=i; exit; // Image was loaded in past - All OK
    end;
   for i:=0 to maxpat do
    if p[i].tag=none then begin
-     p[i].loadr(a+'.bmp'); // Loading...
+     p[i].loadr(a); // Loading...
      if p[i].tag=none then loadbmpr:=noImage // Image not found
      else loadbmpr:=i; // All OK
      exit;
@@ -212,14 +215,14 @@ var
   i:tnpat;
 begin
   error:=0;
-  a:=dbmp+a; // BMP\<a>.bmp
+//  a:=dbmp+a; // BMP\<a>.bmp
   for i:=0 to maxpat do
    if p[i].equal(a,left) then begin
      loadasbmp:=i; exit; // Image was loaded in past - All OK
    end;
   for i:=0 to maxpat do
    if p[i].tag=none then begin
-     p[i].loadbmp(a+'.bmp'); // Loading...
+     p[i].loadbmp(a); // Loading...
      if p[i].tag=none then loadasbmp:=noImage // Image not found
      else loadasbmp:=i; // All OK
      exit;
@@ -245,11 +248,12 @@ begin
   if pos('.',n)=0 then getfilename:=n else getfilename:=copy(n,1,pos('.',n)-1);
 end;
 
+
 procedure tbmp.load(a:string);
 begin
-  if diskload and fexist(a) then
+  if diskload and bmpexist(a) then
   begin
-{    load:=}tbmp.loadfile(a);
+{    load:=}tbmp.loadfile(findbmp(a));
     if x<>0 then
     begin
 {      convert2spr;}
@@ -257,7 +261,7 @@ begin
     end;
   end;
   if x=0 then
-  if w.exist(a) then
+  if aw.exist(a) then
   begin
 {    load:=}tbmp.loadwad(getfilename(a));
     if x<>0 then
@@ -302,13 +306,15 @@ var
   p:array[0..256,0..3]of byte;
   i,j,bpl:longint;
   t:array[0..1024*2{Or more- max x}] of byte;
+  null: longint;
 begin
   seek(f,fmtsize); // 54
   blockread(f,p,sizeof(p));
   seek(f,fmt.fmtsize); //54+1024
-  bpl:=fmt.imagesize div y;
+  bpl:=fmt.imagesize div y-xl;
   for i:=y-1 downto 0 do begin
-    blockread(f,t,bpl);
+    blockread(f,t,xl);
+    if bpl<>0 then blockread(f,null,bpl);
     for j:=0 to x-1 do
     {$ifdef high}
       bmp^[i*x+j]:=rgb(p[t[j],2],p[t[j],1],p[t[j],0]);
@@ -477,6 +483,35 @@ begin
   sprite(ax-x div 2,ay-y);
 end;
 
+var
+  t:array[0..800]of color;
+
+procedure tspr.spritergb(ax,ay:xy; r,g,b: byte);
+var
+  i,j,ss,sx,sy,l: longint;
+begin
+  if tag=ibmp then begin tbmp.put(ax,ay); exit; end;
+  ss:=0;
+  for i:=1 to sprlines do begin
+     sx:=spr^[ss+0];
+     sy:=spr^[ss+1];
+//    if sy+ay>max.y then break;
+     l:=spr^[ss+2];
+
+     move(spr^[ss+3],t,l);
+
+     for j:=0 to l-1 do
+       t[j]:=blu[t[j]];
+
+     fpgraph .sprite(t{spr^[ss+3]},ax+sx,ay+sy,l);
+     {$ifndef high}
+     l:=l + l mod 2;
+     l:=l div 2;
+     {$endif}
+     inc(ss,l+3);
+  end;
+end;
+
 procedure tspr.sprite(ax,ay:xy);
 var
   i,ss,sx,sy,l: longint;
@@ -497,10 +532,11 @@ begin
   end;
 end;
 
-procedure tspr.spriteo(ax,ay:xy; c:color);
+procedure tspr.spriteo(ax,ay:xy; c:color; r,g,b: byte);
 var
   i,ss,sx,sy,l: longint;
 begin
+  if not((r=255)and(g=255)and(b=255))then begin spritergb(ax-x div 2,ay-y,r,g,b); exit; end;
   if c=0 then begin spritesp(ax,ay); exit; end;
   ax:=ax-x div 2; ay:=ay-y;
   ss:=0;
@@ -596,6 +632,33 @@ begin
   end;
   close(f);
 end;
+
+procedure tbmp.putrot(ax,ay: xy; al: real);
+var
+  i,j, cx,cy,nx,ny,dx,dy: integer;
+  col: color;
+  s,c: real;
+  ss: integer;
+begin
+  if tag<>ibmp then exit;
+  dx:=x div 2;
+  dy:=y div 2;
+  ss:=round(x/2);
+  s:=sin(al); c:=cos(al);
+  for i:=-ss to x-1+ss do
+    for j:=-ss to y-1+ss do begin
+      cx:=i-dx;
+      cy:=j-dy;
+      nx:=round(c*cx-cy*s)+dx;
+      ny:=round(c*cy+cx*s)+dy;
+      if (nx>=0)and(nx<x)and(ny>=0)and(ny<y)then begin
+        col:=bmp^[nx+ny*x];
+        if col<>0 then fpgraph.putpixel(ax-dx+i,ay-dy+j,col);
+      end;
+    end;
+end;
+
+
 begin
   noImage:=0; NoIndex:=0;
   fillchar(p,sizeof(p),0);

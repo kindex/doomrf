@@ -113,7 +113,7 @@ var
   sfps,winall:boolean;
   wb,rb:tfont;
 
-  rocket2,inx,iny: integer;
+  inx,iny: integer;
 
 
 //function loadbmp(s:string):integer;
@@ -130,9 +130,11 @@ procedure rectangle2(x1,y1,x2,y2:integer; c:byte);
 function getcolor(r,g,b:longint):byte;
 procedure delay(n:real);
 function putbmpall(s:string):boolean;
+function enterwall(s:string):string;
 function enterfile(s:string):string;
 procedure log(b:string; a:longint);
 function exist(s:string):boolean;
+procedure readlinebmp(x,y:integer; var str:string; last:string; col:byte; fl:integer);
 //function loadbmpr(s:string):tnpat;
 (*******************************)implementation(****************************)
 uses rfunit;
@@ -154,8 +156,9 @@ begin
 end;}
 function exist(s:string):boolean;
 begin
-  exist:=w.exist(s) or fexist(s)or fexist(dbmp+s+'.bmp');
+  exist:=aw.exist(s) or bmpexist(s);
 end;
+
 procedure log(b:string; a:longint);
 var f:text;
 begin
@@ -164,12 +167,21 @@ begin
   writeln(f,b,': ',a);
   close(f);
 end;
+
 function enterfile(s:string):string;
 var res:string;
 begin
   readline(100,100,res,s,white,0);
   enterfile:=res;
 end;
+
+function enterwall(s:string):string;
+var res:string;
+begin
+  readlinebmp(100,100,res,s,white,0);
+  enterwall:=res;
+end;
+
 procedure delay(n:real);
 var
   t:ttimer;
@@ -181,38 +193,49 @@ begin
   until keypressed or (abs(t.tik-t.start)>n*18);
   while keypressed do readkey;
 end;
+
 function putbmpall(s:string):boolean;
 var
   f:file;
-  b:array[0..1600]of byte;
+//  b:array[0..1600]of byte;
   x,y,dx,dy,c,i,j,x1,y1:integer;
   k,kx,ky:real;
   ost,o:longint;
+  t: tnpat;
 begin
-  putbmpall:=false;
-  if w.exist(getfilename(s)) then
+  t:=loadasbmp(s);
+{  putbmpall:=false;
+  if aw.exist(getfilename(s)) then
   begin
-    putbmpall:=true;
-    w.assign(getfilename(s));
-    w.read(x,2); w.read(y,2);
-    w.read(dx,2); w.read(dy,2);
-    kx:=maxx/x;
-    ky:=maxy/y;
+    putbmpall:=true;}
+{    aw.assign(getfilename(s));
+    aw.read(x,2); aw.read(y,2);
+    aw.read(dx,2); aw.read(dy,2);}
+  x:=p[t].x;
+  y:=p[t].y;
+
+   kx:=maxx/x; if kx>2 then kx:=2;
+   ky:=maxy/y; if ky>2 then ky:=2;
     x1:=0; y1:=0;
-    if kx<ky then begin k:=kx; y1:=(maxy-round(y*k))div 2; end
-    else begin k:=ky; x1:=(maxx-round(x*k))div 2; end;
+
+    if kx<ky then begin k:=kx;  end
+    else begin k:=ky;  end;
+
+    y1:=(maxy-round(y*k))div 2;
+    x1:=(maxx-round(x*k))div 2;
+
     for c:=0 to y-1 do
     begin
-      w.read(b,x);
+//      aw.read(b,x);
       for i:=round(k*c) to round(k*(c+1)) do
        for j:=0 to round((x-1)*k) do
-         putpixel(x1+j,y1+i,b[round(j/k)]);
+         putpixel(x1+j,y1+i,p[t].bmp^[c*x+round(j/k)]);
     end;
-  end
+(*  end
   else
   begin
     putbmpall:=true;
-    assign(f,dbmp+s+'.bmp');
+    assign(f,s+'.bmp');
     {$i-}reset(f,1); {$i-}
     if ioresult<>0 then
       putbmpall:=false
@@ -252,7 +275,7 @@ begin
     end;}
       close(f);
     end;
-  end;
+  end;*)
   screen;
 end;
 
@@ -517,11 +540,60 @@ begin
   if x1=x2 then for i:=y1 to y2 do putpixel(x1,i,c);
   if y1=y2 then for i:=x1 to x2 do putpixel(i,y1,c);
 end;}
+
 procedure readline(x,y:integer; var str:string; last:string; col:byte; fl:integer);
 const maxen=255;
 var c:char;
     s:string;
     i,j,cur:longint;
+begin
+  s:=last;
+  i:=0;
+  cur:=length(s)+1;
+  repeat
+{    for j:=y to y+8 do system.move(scr^[j*320],mem[sega000:j*320],320);}
+    repeat
+      inc(i); {delay(1);error}
+
+      bar(x,y,x+maxen*8,y+8,black);
+
+      print(x,y,col,s);
+      if i mod 100<50 then
+       line(x+cur*8-8,y,x+cur*8-8,y+8,col)
+       else
+       line(x+cur*8-8,y,x+cur*8-8,y+8,black);
+       screen;
+    until keypressed;
+    c:=readkey;
+    case c of
+     #0:case readkey of
+       #75: if cur>1 then dec(cur);
+       #77: if cur<=length(s) then inc(cur);
+       #83: begin s:=copy(s,1,cur-1)+copy(s,cur+1,length(s)-cur); end;
+     end;
+     #8:  if cur>1 then begin s:=copy(s,1,cur-2)+copy(s,cur,length(s)-cur+1); dec(cur); end;
+     #13: break;
+     #27: s:='';
+    else
+    begin
+     case fl of
+     0:begin s:=copy(s,1,cur-1)+c+copy(s,cur,length(s)-cur+1); inc(cur); end;
+     1:if c in ['0'..'9','-','.']then begin s:=copy(s,1,cur-1)+c+copy(s,cur,length(s)-cur+1); inc(cur); end
+     end;
+    end;
+    end;
+{    screen;
+    print(x,y,15,'->'+s);}
+  until c in [#13,#27];
+  str:=s;
+  while keypressed do readkey;
+end;
+
+procedure readlinebmp(x,y:integer; var str:string; last:string; col:byte; fl:integer);
+const maxen=255;
+var c:char;
+    s:string;
+    i,j,cur,t:longint;
 begin
   s:=last;
   i:=0;
@@ -536,6 +608,11 @@ begin
        line(x+cur*8-8,y,x+cur*8-8,y+8,col)
        else
        line(x+cur*8-8,y,x+cur*8-8,y+8,black);
+
+       t:=loadasbmp(s);
+
+       p[t].sprite(x,y+32);
+
        screen;
     until keypressed;
     c:=readkey;

@@ -1,0 +1,252 @@
+DOOM 513 (1.5)  Data: 18.1.2002  Lines: 11099
+Bug Fix: Teleport
+Level total kills, items, time
+CRC protect ini-files
+Level 0
+Mini turret
+Blue monster when freez
+Bullet/armor limit
+Triger Buttons
+-------------------------------------------------
+DOOM 513 (1.45-47)  Data: 31.12.2001  Lines: 10677
+doom.ini -> speed settings
+Duck
+Update sniper AI
+Пузырьки воздуза под водой !
+-------------------------------------------------
+DOOM 513 (1.42-44)  Data: 19.12.2001  Lines:  9624
+Возможен : 16 bit color
+Sprites.pas -> >64K
+New WadEdit (+bugs)
+Interface
+Editor+  FillWall  WillFace
+
+New MODS:  RF\  Unrel\
+Many WADs and BMPdirs
+Сообщения - оружия, патроны, атечки, фраги
+------------------------------------------------
+DOOM 513 (1.40-41) Data 14.12.2001
+Double weapons (два пистолета)
+LongJump
+Usk, g - monsters
+Акулы
+Wallpapers
+-------------------------------------------------
+DOOM 513 (1.39) Data 13.12.2001
+!!! Free Pascal  +50% FPS
+Attck2 - Alt
+Непрозрачные монстры
+BFG - 20 патронов - выстрел (патроны от плазменной винтовки)
+  Лазер - BFG
+Levels\#.lev
+-------------------------------------------------
+Weapons:
+  Двустволка 80 / 2 сек
+  Гранатомет 35 / 0.5 сек
+  Glock - по два
+
+>> MODS: *.mod
+menu: intro + skull# (1..2)  Lose, Win, Start
+Game:
+  StartPlayers + Bots
+  Defitem
+  FreeItem
+  Vis (health indicator) vis# (1..7)
+Levels:
+  level list
+
+-------------------------------------------------
+DOOM 513  (1.34-37)  Data:  8.12.2001
+Saves: Saves\save#.sav
+Free scrolling (no cliping)
+Bot command: cover me!
+ShortCuts forweapons: 1..9
+AI update
+Новое оружие - вместо Plasma Rifle -> Freezer
+
+-------------------------------------------------
+DOOM 513  (1.31-33)  Data:  3.11.2001
+Добавлены новые виды стен (в редакторе - стены)
+Functions:
+  (Действуют на следующюю по номеру функцию)
+  Teleport - перебрасывает в Target [i+1]
+  Target - функция для teleport u Door
+  Open - Очищяет место Target [i+1]
+  Close - Заполняет место Target [i+1]
+;В редакторе сначала создайте прямоугольник (tele, open, close) а
+  затем в другом месте target - это будет зона действия функции
+
+Only in Deathmatch:
+  Предмет или монстр появится только в режиме боя насмерть
+
+Монстры умирают в воде и в DIE
+При полете вращается свастика
+bot*.ini -> Bots\bot*.ini
+Новый пистолет (Glock - отнимает 5%)
+Автодобавление комнаты в LEVEL.INI
+-------------------------------------------------
+DOOM 513 (30)  AllLines: 12917 Data:  2.11.2001
+BOT skills 1-5 (skillmenu)
+All cheats
+Factory.lev
+-----------------------------------------------
+DOOM 513 v0.29  Data:  27.05.2001
+GrafX 1.4 - All modes in Win9x
+-----------------------------------------------
+DOOM 513 v0.28   Lines: 3761  Data:  16.04.2001
+BUG: Bots don't atack player? (only if bot is in own screen (with nodes))
+Next weapon / -> Shift
+load all bot*.ini (can make custom bot ini-files)
+-----------------------------------------------
+DOOM 513 v0.27   Lines: 3742  Data:  15.04.2001
+Editor - nodes - Middle button - half links
+-----------------------------------------------
+DOOM 513 v0.26   Lines: 3721  Data:  14.04.2001
+bot.ini /max bots-4
+Error: Code segment too large (Some procs in GrafX.pas)
+4 palyers - Pad % Mouse
+Elevators: up - left - right
+70 new textures (from HL)
+-----------------------------------------------
+DOOM 513 v0.25   Lines: 3536  Data:  13.04.2001
+Bullets - energy
+Лава/Вода
+Styled nodes
+Levels: comments, (c)
+!!! BOT
+params: rf.exe [debug]
+-----------------------------------------------
+DOOM 513 v0.24   Lines: 3491  Data:  11.04.2001
+PUT PAT - Q
+New level format: FL01 -> 16 bytes reserved+nodes
+Nodes:
+   Normal
+   Items
+   Goal
+   Important
+   Walk/Jump
+-----------------------------------------------
+DOOM 513 v0.23   Lines: 3224  Data:  10.04.2001
+Arena.lev
+Лестница - выталкивание
+Искры
+reswap - bomb plasma rifle
+Fix bug: скроллинг в редакторе
+Tex: цепь
+------------------------------------------------------------
+DOOM 513 v0.21   Lines: 2989  Data:  8.04.2001
+Кто нашел эти строчки - молодец
+>>> Пароли
+Внимание - будте уветены что не переключились на русский язык
+Победа     WIN
+Пути ботов DEBUG
+Бесмертие  GOD
+Все оружие ALL
+Вся броня  TANK
+Комната    LEV+<level name>
+
++New WAD - refresh bitmaps
+------------------------------------------------------------
+DOOM 513 v0.20   Lines: 2989  Data:  7.04.2001
+Сложность
+1  Стреляют друг в друга / Далеко не видят              180     Проще пареной репы
+2  Стреляют друг в друга / Видят везде                  120     Для сельской местности
+3  Стреляют насквозь     / Видят везде                  60      Норма
+4  Стреляют насквозь/ Прицельно/ Зажигают/ Видят везде  60      Жизнь
+5  Стреляют насквозь/ Reswap   / Зажигают/ Видят везде  60      Кошмар
+Фраги/Смерти
+Eagle MP5 GL
+Red title
+------------------------------------------------------------
+DOOM 513 v0.19   Lines: 2915  Data:  6.04.2001
+log.txt
+Weapons: Flamer, BFG
+Save weapons and health -> next level
+Sorted all *.ini files
+------------------------------------------------------------
+DOOM 513 v0.18   Lines: ????  Data:  4.04.2001  FPS: 30
+Load SPR+
+Weapons: RPG, plasma rifle, AK47, knife
+Monster: terrorist
+Fix bug: acceleration - none
+Lose - 10 bitmaps
+------------------------------------------------------------
+DOOM 513 v0.16   Lines: ????  Data:  2.04.2001  FPS: 80
+map03
+Delay when kill
+res.ini
+Enemy damage only you
+------------------------------------------------------------
+DOOM 513 v0.15   Lines: ????  Data:  1.04.2001  FPS: 80
+640x400
+Shotgun
+------------------------------------------------------------
+DOOM 513 v0.12   Lines: 2864  Data: 11.03.2001  FPS: 80
+Menu Intro Outtro
+2 levels
+2 fonts
+------------------------------------------------------------
+DOOM 513 v0.10   Lines: 2136  Data: 8.03.2001  FPS: 112
+New Save and Load
+AI
+MAP01
+4 players
+Multiplayer + Deathmatch
+------------------------------------------------------------
+DOOM 513 v0.09   Lines: 2000  Data: 7.03.2001  FPS: 112
+---------Beta1
+tItem
+tPlayer
+Stay weapons
++readey
+bmp: win1-3 lose1-3 start1-2
+------------------------------------------------------------
+DOOM 513 v0.08   Lines: 1800  Data: 6.03.2001  FPS: 110
+7 Monsters
+5 weapons
+readkey -> interrupt
+tMon Atack Kill
+item.txt
+New Font: Large Red Digits
+------------------------------------------------------------
+DOOM 513 v0.07   Lines: 1600  Data: 5.03.2001  FPS: 100
+Name: Doom RF
+weapon.ini
+bomb.ini
+bullet.ini
+tBul
+tBomb
+Новые идеи: оружие из Wolf, зфездочки в виде свастики
+  фотки из Commnados+(puh8.bmp), рогатка
+------------------------------------------------------------
+RF v0.05   Lines: 1266  Data: 3.03.2001  FPS: =30 (50)
+TMon - Run Jump
+Monster.ini
+------------------------------------------------------------
+RF v0.04   Lines: 900   Data: 2.03.2001  FPS: =30 (Standart)
+tPix
+Editor: Face Wall Load Save Exit New
+------------------------------------------------------------
+RF v0.03   Lines: 700   Data: 1.03.2001  FPS: ~150
+Unit F32MA +15 fps (50+15)
+tmap
+  patname
+  pat
+  m:^tmon
+  item:^titem
+  f:^tf
+  load
+  save
+  draw
+  move
+allwall
+edotor
+------------------------------------------------------------
+RF v0.02   Lines: 277   Data: 28.02.2001  FPS: 150
+Loading from WAD
+wall.txt
+tbmp
+timer
+puh.bmp
+cursor.bmp -> mouse
+doom.pal

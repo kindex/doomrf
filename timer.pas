@@ -3,6 +3,7 @@
 unit timer;
 interface
 const
+  tpr=18.2;
   tps:longint=18; {Tiks per second (18.2)}
   besttps:longint=100;
   onesec=1;

@@ -1336,10 +1336,10 @@ var
   f:text;
   s: string;
 begin
-  cur:=0; max:=0;
   assign(f,a{+dotmod});
 {$i-}  reset(f); {$i+}
   if ioresult<>0 then begin loadini:=false; exit; end;
+  cur:=0; max:=0;
 
   repeat
     readln(f,s);
@@ -5551,7 +5551,8 @@ end;
 
 procedure loadlevellist(b:string);
 begin
-{  if not }level.loadini(runmod+'\mod.ini',b){then}
+{  if not }level.loadini(mainmod+'\levels.ini',b);{then}
+{  if not }level.loadini(runmod+'\levels.ini',b);{then}
 {  if not level.loadini(mainmod+'\mod.ini',b)then
    writeln('No mod.ini found in dirs '+runmod+' and '+mainmod);}
 end;

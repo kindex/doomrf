@@ -3,10 +3,12 @@ unit wads;
 
 interface
 uses api,dos,crt;
+const
+  maxwad=16;
 type
   tcapt=array[1..4]of char;
   tel=object
-    n,l:longint;
+    n {Pos},l {Size}:longint;
     name:array[1..8]of char;
     function getname:string;
     procedure read(var f:file; var p; s:longint);
@@ -14,12 +16,12 @@ type
     procedure seek(w:longint);
   end;
   ptable=^ttable;
-  ttable=array[1..4000]of tel;
+  ttable=array[1..8000]of tel;
   tarray=array[1..64000]of byte;
   twad=object
-    name:string[12];
-    capt:tcapt;
-    n,tab:longint;
+    name:string;
+    capt:tcapt; {IWAD PWAD}
+    n {Items},tab {Table Pos}:longint;
     table: ptable;
     f:file;
     findn,error:longint;
@@ -46,9 +48,20 @@ type
     function  getel(s:string):integer;
     function  exist(s:string):boolean;
   end;
+  taw=object
+    mw,cw: integer;
+    w:array[1..maxwad] of twad;
+    procedure addall(s:string);
+    procedure addwad(s:string);
+    procedure assign(ss:string);
+    procedure read(var p; s:longint);
+    function  exist(s:string):boolean;
+  end;
+
 var
-  w:twad;
+  aw: taw;
   p:^tarray;
+
 
 implementation
 uses ports,sprites,fpgraph;
@@ -110,32 +123,39 @@ procedure twad.writecapt;
 begin
   seek(f,4); blockwrite(f,n,4); blockwrite(f,tab,4);
 end;
+
 procedure twad.delete(ss:string);
 var
-  k,i:longint;
-  p:^tarray;
+  k,i,sm,sos:longint;
+  p: pointer;
 begin
   write('Удаляю ',ss:10);
-  new(p);
   k:=getel(ss);
   if error<>0 then begin writeln(' ******* Не могу найти ',ss);exit; end;
-  for i:=k to n-1 do table^[i]:=table^[i+1];
-  dec(n);
-  for i:=k to n do
-  begin
-    write('.');
-    seek(f,table^[i].n);
-    system.blockread(f,p^,table^[i].l);
-    dec(table^[i].n,cur.l);
-    seek(f,table^[i].n);
-    system.blockwrite(f,p^,table^[i].l);
+
+
+  sm:=filesize(f);
+  getmem(p,sm);
+  sos:=sm-table^[k+1].n-n*16;
+  write(' (двигаю ',sos,' байтов) ');
+  seek(f,table^[k+1].n); blockread (f,p^,sos);
+  seek(f,table^[k].n);   blockwrite(f,p^,sos);
+
+  for i:=k to n-1 do begin
+    table^[i]:=table^[i+1];
+    dec(table^[i].n, cur.l);
   end;
-  dec(tab,cur.l);
-  seek(f,tab);
-  blockwrite(f,table^,n*16);
-  writecapt;
-  dispose(p);
+  dec(n);
+
+  dec(tab, cur.l);
+  seek(f, tab); blockwrite(f,table^,n*16);
   truncate(f);
+
+  writecapt;
+
+  freemem(p,sm);
+
+
   writeln('Ok');
 end;
 
@@ -362,8 +382,11 @@ begin
   cur.name:=#0#0#0#0#0#0#0#0;
   error:=1;
 end;
+
 procedure twad.load;
-const c:tcapt='IWAD';
+const
+  c:tcapt='IWAD';
+  c2:tcapt='PWAD';
 var
   i:integer;
 begin
@@ -378,7 +401,8 @@ begin
      exit;
    end;
   system.blockread(f,capt,4);
-  if c<>capt then begin system.close(f); writeln(name,'-Это не IWAD файл');halt;end;
+  if (c<>capt)and(c2<>capt) then begin system.close(f); writeln(name,'-Это не IWAD (PWAD) файл');halt;end;
+
   system.blockread(f,n,4);
   system.blockread(f,tab,4);
   system.seek(f,tab);
@@ -387,7 +411,8 @@ begin
   system.blockread(f,table^,16*n);
 {  for i:=1 to n do begin   system.blockread(f,table^[i],16); end;}
   loaded:=true;
-//  writeln('WAD файл загружен успешно (',n,' элементов)');
+
+  writeln(name+' loaded (',n,' items)');
 end;
 procedure twad.dir;
 var i:longint;
@@ -411,6 +436,52 @@ begin
   writeln('Размер файла ',name,': ',n*16+tab);
   writeln('Элементов: ',n);
 end;
+
+procedure taw.assign(ss:string);
+var
+ i:integer;
 begin
+  for i:=mw downto 1 do
+   if w[i].exist(ss)then begin
+     cw:=i;
+     w[cw].assign(ss);
+     exit;
+   end;
+  error:=1;
+end;
+procedure taw.read(var p; s:longint);
+begin
+  w[cw].read(p,s);
+end;
+function  taw.exist(s:string):boolean;
+var
+  i: integer;
+begin
+  for i:=mw downto 1 do
+   if w[i].exist(s)then begin
+     exist:=true;
+     exit;
+   end;
+  exist:=false;
+end;
+procedure taw.addwad(s:string);
+begin
+  inc(mw);
+  w[mw].load(s);
+end;
+
+procedure taw.addall(s:string);
+var
+  f:searchrec;
+begin
+  findfirst(s+'\*.wad',anyfile,f);
+  while doserror=0 do begin
+    addwad(s+'\'+f.name);
+    findnext(f);
+  end;
+end;
+
+begin
+  fillchar(aw,sizeof(aw),0);
   new(p);
 end.
