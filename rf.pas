@@ -4,6 +4,7 @@
 program RF; {First verion: 27.2.2001}
 uses crt,mycrt,mouse,wads,dos,fpgraph,grx,sprites,rfunit,timer,api,ports;
 const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
+  menutitle='DOOM 513';
   accel:integer=-1;
   mainmod:string='RF';
   runmod:string='RF';
@@ -12,12 +13,12 @@ const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   levext='.lev';
   dotmod='.mod';
 
-  maxl=4;
+  maxl=8;
   defence1:real=1/4;
   defence2:real=1/3;
   fraglimit:integer=-1;
   mousepl=4;
-  kniferange=33;
+  kniferange=20;
   oxysec=10;
   bombfire=4;
   reswapbomb=2;
@@ -147,11 +148,11 @@ type
     procedure move; virtual;
     procedure draw(ax,ay:integer);
   end;
-  tstate=(stand,run,fire,die,crash,hack,hai);
+  tstate=(stand,run,fire,die,crash,hack,hai, duck);
   tmon=object(tobj)
      life,ai,know,see,barrel,aqua: boolean;
      target: record x,y,mon:integer end;
-     who,lastwho: 0..maxmon;
+     who,lastwho: integer{0..maxmon};
      dest: tdest;
      tip: tmaxmontip;
      delay,freez,fired,deldam,statedel,vis,savedel,hero,god,longjumpn,jumpfr,
@@ -165,9 +166,10 @@ type
 
      function getcx:real;
      function getcy:real;
-
+     function clever: boolean;
      function getmaxhealth: real;
      function getg:real; virtual;
+     function onhead(ax,ay: integer):boolean;
      procedure clearwall(c:byte);
      procedure fillwall(c:byte);
      procedure takebest(mode:integer);
@@ -399,6 +401,11 @@ type
 (******************************** Variables *********************************)
 var
   scrmode: (normal,reverse,shift,wave);
+  settings:record
+    botframe,mondelay: integer;
+
+  end;
+
   unpush: boolean;
   keybuf,wintext1,wintext2:string;
   pnode,pnodei,pnodeg, panel1,panel2: tnpat;
@@ -408,21 +415,29 @@ var
   ed:ted;
   d:array[0..9]of tnpat;
   dminus,dpercent:tnpat;
-{  p:array[0..maxpat]of tbmp;}
-{  names:array[byte]of string[8];}
   allwall: arrayofstring8;
   mx,my,lastx,lasty,add:longint;
   push,push2,push3,loaded:boolean;
   mfps,maxallwall:longint;
   cur:tnpat;
-//  vec:procedure;
   player:array[1..maxplays]of tplayer;
   level:tlevel;
   info: tinfo;
   lastinidir,winallbmp,startbmp,winbmp,losebmp:string;
-{  heiskin: array[tdest]of tnpat;}
+  botcol:array[1..maxplays]of color;
+
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
+function tmon.clever: boolean;
+begin
+  clever:=monster[tip].health>200;
+end;
+function tmon.onhead(ax,ay: integer):boolean;
+begin
+  onhead:=(abs(ax-getcx)<getsx*8)and
+   ( (abs((getcy-getsy*4)-ay)<8)or
+    (abs((getcy+getsy*4)-ay)<8));
+end;
 
 procedure tinfo.clear;
 begin
@@ -458,10 +473,24 @@ procedure tinfo.draw(ax,ay: integer);
 const
   h=10;
 var
-  i: integer;
+  i,y,c: integer;
 begin
-  for i:=1 to ml do
-    print(ax,ay+(i-1)*h, l[i].c, l[i].s);
+  y:=0;
+  for i:=1 to ml do begin
+    if l[i].time>(mfps/speed) then begin
+      print(ax,ay+y, l[i].c, l[i].s);
+      inc(y,h);
+    end
+    else begin
+      c:=getcolor(
+      round(pal[l[i].c*4+2]*l[i].time/mfps*speed),
+      round(pal[l[i].c*4+1]*l[i].time/mfps*speed),
+      round(pal[l[i].c*4+0]*l[i].time/mfps*speed));
+
+      print(ax,ay+y,c, l[i].s);
+      inc(y,round(h*l[i].time/mfps*speed));
+    end
+  end;
 end;
 
 procedure tinfo.delete(a:integer);
@@ -507,11 +536,29 @@ begin
   end;
 end;
 
+procedure putlogo(a,b:string; del: integer);
+var
+  c,i,j: integer;
+begin
+  clear;
+  box(0,0,getmaxx,getmaxy);
+  c:=1;
+  while exist(a+st(c)) do inc(c);
+  dec(c);
+  c:=random(c)+1;
+  if exist(a+st(c)) then begin
+    putbmpall(a+st(c));
+    rb.print((getmaxx-rb.width(b)) div 2,getmaxy-10,b);
+    screen;
+    delay(del);
+  end;
+end;
 procedure winallgame;
 begin
   clear;
 
 //  putbmpall(winallbmp);
+  putlogo(winallbmp,'',0);
 
   wb.print((getmaxx-rb.width(wintext1))div 2,getmaxy div 2-40,wintext1);
   wb.print((getmaxx-rb.width(wintext2))div 2,getmaxy div 2,wintext2);
@@ -527,10 +574,14 @@ const
   y1:integer=50;
   d=22;
 procedure draw;
-var i,j,sx,sy:integer;
+var
+  i,j,sx,sy:integer;
+  tt: string;
 begin
   clear;
-{  putintro('intro'); Update - }
+
+{  putintro('intro');}
+
   sx:=(getmaxx-p[intro].x) div 2;
   sy:=(getmaxy-p[intro].y) div 2;
 
@@ -544,6 +595,10 @@ begin
     wb.print(x1,y1+(i-1)*d,men[i]);
   if hod mod 90<45 then j:=skull1 else j:=skull2;
   p[j].sprite(x1-30,y1-5+(ch-1)*d);
+
+  tt:=menutitle+': '+runmod+' ['+version+']';
+  box(0,0,getmaxx, getmaxy);
+  rb.print((maxx-rb.width(tt))div 2,maxy-10, tt);
 
   screen;
 end;
@@ -729,35 +784,18 @@ begin
   close(f);}
 end;
 
-procedure putlogo(a,b:string; del: integer);
-var
-  c: integer;
-begin
-  clear;
-  box(0,0,getmaxx,getmaxy);
-  c:=1;
-  while exist(a+st(c)) do inc(c);
-  dec(c);
-  c:=random(c)+1;
-  if exist(a+st(c)) then begin
-    putbmpall(a+st(c));
-    rb.print((getmaxx-rb.width(b)) div 2,getmaxy-10,b);
-    screen;
-    delay(del);
-  end;
-end;
 
 procedure drawwin;
 begin
-//  putlogo(winbmp,'Теперь можно отпразновать победу',3);
+  putlogo(winbmp,'Теперь можно отпразновать победу',3);
 end;
 procedure drawlose;
 begin
-//  putlogo(losebmp,'У вас проблемы со здоровьем',3);
+  putlogo(losebmp,'У вас проблемы со здоровьем',3);
 end;
 procedure drawintro;
 begin
-//  putlogo(startbmp,'В это время...',3);
+  putlogo(startbmp,'В это время...',3);
 end;
 
 procedure tnode.dellink(an:integer);
@@ -922,6 +960,7 @@ end;
 procedure tlevel.load;
 var i:integer;
 begin
+  info.clear;
 { if not first then} started:=false;
   for i:=1 to maxpl do
   with map.m^[player[i].hero] do
@@ -968,6 +1007,9 @@ begin
     bul:=player[i].save.bul;
   end;
   started:=true;
+  info.clear; speed:=1;
+  info.add(map.copy,dark,10);
+  info.add(map.com,dark,10);
 end;
 procedure tlevel.next;
 var i:longint;
@@ -1127,7 +1169,7 @@ begin
   mx:=round(x);
   my:=round(y);
 
-  if tip=13 then
+  if (tip=13)or(tip=12) then
   for i:=max(0,ax div 8) to min(map.x-1,(ax+asx)div 8) do
     for j:=max(0,ay div 8) to min(map.y-1,(ay+asy)div 8) do
      map.land[j]^[i].land:=map.land[j]^[i].land or cfunc;
@@ -1539,16 +1581,19 @@ begin
    if (map.m^[m].enable)and(map.m^[m].life)and not map.m^[m].barrel then
      if m<>hero then
      if level.death or (map.m^[m].hero=0) then begin
-      if (abs(map.m^[m].mx-mx)<kniferange)and(abs(map.m^[m].my-my)<kniferange)then begin
-       seex:=map.m^[m].mx-mx;
-       seey:=map.m^[m].my-my;
+      if map.m^[hero].onhead(round(map.m^[m].getcx),round(map.m^[m].getcy))then begin
+       seex:=round(map.m^[m].getcx-map.m^[hero].getcx);
+       seey:=round(map.m^[m].getcy-map.m^[hero].getcy);
+       map.m^[hero].target.x:=round(map.m^[m].getcx);
+       map.m^[hero].target.y:=round(map.m^[m].getcy);
+       map.m^[hero].target.mon:=m;
        seeany:=true;
        exit;
       end;
-      if (abs(map.m^[m].my-my)<24) then
-        if abs(map.m^[m].mx-mx)<min then
+      if (abs(map.m^[m].getcy-map.m^[hero].getcy)<24) then
+        if abs(map.m^[m].getcx-map.m^[hero].getcx)<min then
         begin
-           min:=abs(map.m^[m].mx-mx);
+           min:=round(abs(map.m^[m].getcx-map.m^[hero].getcx));
            f:=m;
       end;
      end;
@@ -1556,14 +1601,17 @@ begin
   if map.m^[f].mx<mx then d:=-1 else d:=1;
   seeany:=true;
   cx:=mx; cy:=my;
-  while abs(map.m^[f].mx-cx)>6 do
+  while abs(map.m^[f].getcx-cx)>6 do
   begin
     if (map.land[cy div 8-2]^[cx div 8].land and cwall)>0 then
         begin seeany:=false; exit; end;
     cx:=cx+d*4;
   end;
-  seex:=map.m^[f].mx-mx;
-  seey:=map.m^[f].my-my;
+  seex:=round(map.m^[f].getcx-map.m^[hero].getcx);
+  seey:=round(map.m^[f].getcy-map.m^[hero].getcy);
+  map.m^[hero].target.x:=round(map.m^[m].getcx);
+  map.m^[hero].target.y:=round(map.m^[m].getcy);
+  map.m^[hero].target.mon:=m;
 end;
 
 procedure tplayer.move;
@@ -1763,6 +1811,14 @@ begin
         20: begin map.m^[hero].usk:=usk*1.6;  end;
         21: begin map.m^[hero].usk:=usk/1.6;  end;
         22: begin map.m^[hero].usk:=ausk;  end;
+        24 {10%- No wepon}: begin
+             fillchar(map.m^[hero].w,sizeof(map.m^[hero].w),0);
+             fillchar(map.m^[hero].bul,sizeof(map.m^[hero].bul),0);
+//             map.m^[hero].w[0]:=1;
+             map.m^[hero].weap:=0;
+             if map.m^[hero].health>10 then
+               map.m^[hero].health:=10;
+        end;
       end;
 
    end;
@@ -1808,9 +1864,9 @@ begin
       if
       (abs(last.x-map.m^[hero].mx)<2)and
       (abs(last.y-map.m^[hero].my)<2)then
-      case random(3) of
-      0:  include(map.m^[hero].key,kjump);
-//        1: include(map.m^[hero].key,kdown);
+      case random(5) of
+      0,1:  include(map.m^[hero].key,kjump);
+        2: include(map.m^[hero].key,kdown);
 //        2: include(map.m^[hero].key,katack);
       end;
       last.x:=map.m^[hero].mx;
@@ -1823,7 +1879,11 @@ begin
     begin
       curn:=map.getnode(mx,my);
 
-      if (abs(seex)<kniferange)and((not level.death)or(level.skill=5)) then wmode:=0
+      if (map.m^[hero].onhead(round(map.m^[hero].target.x),round(map.m^[hero].target.y))and((not level.death)or(level.skill>=4)))
+      then begin
+        wmode:=0;
+        include(map.m^[hero].key,kdown);
+      end
       else
       if abs(seex)>128 then wmode:=2 else
          wmode:=1;
@@ -1871,7 +1931,7 @@ begin
   else
    p[it[tip].skin[norm(
    1,it[tip].max,
-    round(it[tip].max*(rtimer.hod*speed*0.5)/mfps)mod it[tip].max+1
+    round(int(it[tip].max*(rtimer.hod*speed*1.2)/mfps))mod it[tip].max+1
    )
    ]].spritesp(mx-ax,my-ay)
 end;
@@ -1880,38 +1940,52 @@ end;
 procedure tmon.attack(nweap: longint);
 var
   l:shortint;
-  sp,per,ry,d,ty:real;
-  i,s,j,k:longint;
+  sp,per,ry,d,ty,s , rx, sx,sy, px,py, tp:real;
+  i,j,k:longint;
 begin
   if (delay>0)or not life then exit;
-  if weapon[nweap].hit>0 then
-  begin
-    s:=kniferange;
-  for i:=0 to maxmon do
-   if (map.m^[i].enable)and(map.m^[i].life) then
-    if (who<>i)and((not ai) or(ai xor map.m^[i].ai)) then
-    if
-    (abs(map.m^[i].x-x)<s)and
-    (abs(map.m^[i].y-y)<s)
-    then
-      map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),weapon[nweap].hit*w[nweap],0,0,0,who,0,0);
-
-  end;
-  setdelay(round(weapon[nweap].shot*mfps/speed));
-  if (not ai)and(bul[weapon[nweap].bul]<=0) then exit;
   case dest of
    left: l:=-1;
    right: l:=1;
   end;
-  ry:=0;
+  if weapon[nweap].hit>0 then
+  begin
+    s:=weapon[weap].range;
+    rx:=getcx+l*getsx*4;
+    ry:=getcy-getsy*2;
+    for i:=0 to maxmon do
+     if (map.m^[i].enable)and(map.m^[i].life) then
+       if (who<>i)and((not ai) or(ai xor map.m^[i].ai)) then begin
+       if
+       (map.m^[i].getcx+map.m^[i].getsx*4+s>rx)and
+       (map.m^[i].getcx-map.m^[i].getsx*4-s<rx)and
+       (map.m^[i].getcy+map.m^[i].getsy*4+s>ry)and
+       (map.m^[i].getcy-map.m^[i].getsy*4-s<ry)
+       then
+         map.m^[i].damage(round(map.m^[i].getcx),round(map.m^[i].y-map.m^[i].getsy*6),weapon[nweap].hit*w[nweap],0,0,0,who,0,0);
+     end;
+  end;
+  setdelay(round(weapon[nweap].shot*mfps/speed));
+  if (not ai)and(bul[weapon[nweap].bul]<=0) then exit;
+  ry:=0; rx:=1;
+
   sp:=(weapon[nweap].speed)*l;
   per:=(rfunit.bul[weapon[nweap].bul].per+weapon[nweap].per)/100;
+
+  d:=sqrt(sqr(target.x-getcx)+sqr(target.y-getcy));
   if ai and level.sniper then
   begin
-    d:=sqrt(sqr(target.x-x)+sqr(target.y-y));
-    ty:=-(target.y-y)/d;
+//    ty:=-(target.y-getcy)/d;
 {    if ty>abs(target.x-x)/d*}
-    ry:=ty*sp;
+    ry:=(getcy-target.y)/d*(-l);
+    rx:=abs(getcx-target.x)/d;
+  end;
+  if ai and onhead(target.x, target.y) and level.sniper{and (abs(getcx-target.x)<getsx*8)} then
+  begin
+    rx:=0;
+    if target.y>getcy then ry:=1*l
+    else ry:=-1*l;
+    l:=0;
   end;
 
   for k:=1 to w[abs(nweap)] do begin
@@ -1920,12 +1994,16 @@ begin
   begin
     if not ai then dec(bul[weapon[nweap].bul],max(1,weapon[nweap].input));
 
-    for i:=1 to rfunit.bul[weapon[nweap].pul].shot do
-      map.initbul(x+l*getsx*4,y-monster[tip].h,
-      sp*(1+random*per-per/2)+dx,
-      sp*(random*per-per/2)+ry-weapon[nweap].speedy
-      ,weapon[nweap].pul,who, boolean(qdamage<>0));
-
+    for i:=1 to rfunit.bul[weapon[nweap].pul].shot do begin
+      px:=sp*(1+random*per-per/2)*rx+dx;
+      py:=sp*(random*per-per/2)+sp*ry-weapon[nweap].speedy;
+{      if ai then begin
+         tp:=px; px:=py; py:=tp;
+      end;}
+      map.initbul(x+l*getsx*4,
+      y-monster[tip].h,
+      px,py,weapon[nweap].pul,who, boolean(qdamage<>0));
+    end;
     setstate(fire,0.1);
   end;
   end;
@@ -1934,7 +2012,7 @@ end;
 
 function tmon.takeweap(n:tmaxweapon):boolean;
 begin
-  if (w[n]=0)and(not level.multi) then
+  if (w[n]=0){and(not level.multi)} then
     if (weapon[n].cool>=weapon[weap].cool) then weap:=n;
 
   if not level.multi and (hero>0)and (w[n]=0) then
@@ -2081,6 +2159,7 @@ begin
       who,dx*bloodu,dy*bloodu);
       map.m^[i].dx:=map.m^[i].dx+dx*0.1;
       detonate;
+      check:=true;
       exit;
     end;
   end;
@@ -2095,7 +2174,7 @@ begin
   false: begin
     sdx:=dx; ax:=mx;
     tobj.move;
-    if (bul[tip].time=0)and(abs(dx)<(0.4))then begin detonate; exit; end;
+    if (bul[tip].time=0)and((abs(dx)+abs(dy))<(0.2))then begin detonate; exit; end;
     if (bul[tip].time<>0)then begin
       if etime>0 then dec(etime);
       if (etime=0)and(bul[tip].time<>0) then begin detonate; exit; end;
@@ -2165,7 +2244,7 @@ end;
 procedure tbomb.init;
 var
   i,s:integer;
-  r,x1,y1: real;
+  rad,x1,y1,pr: real;
 begin
   enable:=true;
   x:=ax; y:=ay; tip:=at;
@@ -2183,23 +2262,39 @@ begin
     then} begin
       x1:=map.m^[i].getcx;
       y1:=map.m^[i].getcy;
-      r:=sqrt(sqr(x1-x)+sqr(y1-y));
+      rad:=sqrt(sqr(x1-x)+sqr(y1-y));
 {Update bombs !!!!}
-      if r<s then
-        map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,bomb[tip].hit,bomb[tip].fired,0,who,0,0);
+      if rad*2<s then
+        map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,bomb[tip].hit,bomb[tip].fired,0,who,0,0)
+      else
+      if rad<s then begin
+        pr:=2*(s-rad)/s;
+        map.m^[i].damage(round(map.m^[i].x),round(map.m^[i].y-map.m^[i].getsy*6),0,bomb[tip].hit*pr,bomb[tip].fired*pr,0,who,0,0);
+      end;
+
     end;
 end;
 
 procedure tmon.setstate;
+var
+  last: tstate;
 begin
   if not life then exit;
+  last:=state;
   state:=as;
-  savedel:=round(ad*mfps/speed);
+  if inwall(cwall) and (last=duck) then state:=duck
+  else
+   savedel:=round(ad*mfps/speed);
 end;
 procedure tmon.setcurstate(as:tstate; ad: real);
+var
+  last: tstate;
 begin
   if not life then exit;
+  last:=curstate;
   curstate:=as;
+  if inwall(cwall) and (last=duck) then curstate:=duck
+  else
   savedel:=round(ad*mfps/speed);
 end;
 procedure tmon.giveweapon;
@@ -2223,23 +2318,59 @@ begin
   end;
 end;
 procedure tmon.dier;
+
+function gett(a:integer): string;
+begin
+  if player[a].bot=0 then
+    gett:='Игрок '+st(a)
+  else
+    gett:='Бот '+st(a)
+end;
+function gett2(a:integer): string;
+begin
+  if player[a].bot=0 then
+    gett2:='игрока '+st(a)
+  else
+    gett2:='бота '+st(a)
+end;
+
+
 begin
   if not life then exit;
-  if not level.multi then
-  if hero>0 then info.add('Вы убиты !!!',red,-1)
-  else
-    if map.m^[dwho].hero>0 then
-      info.add(monster[tip].name+' убит',red,5);
 
-  life:=false;
-  if (map.m^[who].hero=0)and(dwho>0)and(map.m^[dwho].hero>0) then
+//  info.add(st(dwho)+' -> '+st(who),red,10);
+if not barrel then
+begin
+  if not level.multi then
+  if hero>0 then
+    info.add('Вы убиты !!!',red,100)
+  else
+    if (dwho>=0)and(dwho<>who) and(map.m^[dwho].hero>0) then
+      info.add(monster[tip].name+' убит',red,5)
+     else
+      info.add(monster[tip].name+' совершил самоубийство',red,5);
+
+  if (level.multi)and(not level.death)and(hero>0)and(player[hero].bot>0)and (map.m^[dwho].hero>0) then begin
+    info.add(gett(hero)+': Не стреляй в меня, '+gett(map.m^[dwho].hero)+', - я из твоей команды !!!',white, 10);
+  end;
+
+  if (level.death)and(hero>0){and(player[hero].bot>0)}and(dwho>=0)and(map.m^[dwho].hero>0) then begin
+    if map.m^[dwho].hero<>dwho then
+      info.add(gett(map.m^[dwho].hero)+' убил '+gett2(hero),botcol[map.m^[dwho].hero], 5)
+    else
+      info.add(gett(map.m^[dwho].hero)+' совершил самоубийство :)',botcol[map.m^[dwho].hero], 5);
+  end;
+
+  if (map.m^[who].hero=0)and(dwho>=0)and(map.m^[dwho].hero>0) then
       inc(player[map.m^[dwho].hero].kill) else
 
   if (map.m^[who].hero<>0)then begin
     inc(player[map.m^[who].hero].die);
-    if (dwho>0)and(map.m^[dwho].hero>0)and(dwho<>who) then
+    if (dwho>=0)and(map.m^[dwho].hero>0)and(dwho<>who) then
       inc(player[map.m^[dwho].hero].frag);
   end;
+end;
+  life:=false;
 
 {  if (hero>0)and(lastwho>0)then
   begin
@@ -2263,6 +2394,7 @@ begin
   giveweapon;
   dier(dwho);
 end;
+
 procedure tmon.damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
 var
   i:integer;
@@ -2279,11 +2411,13 @@ begin
   if armoroxy<>0 then coxy:=0;
   if armorfreez<>0 then afreez:=0;
 
+  if (coxy>0)and(dwho=-1)then dwho:=lastwho;
+
   if (freez>0)and(afreez=0) then begin
     hit:=hit*10;
     bomb:=bomb*10;
   end;
-  if health>300 then begin
+  if clever then begin
     coxy:=0;
     afreez:=0;
   end;
@@ -2306,8 +2440,10 @@ begin
     if armor<0 then begin health:=health+armor/defence2; armor:=0; end;
   end;
 
-  if dwho>0 then lastwho:=dwho;
-  if ai and (dwho>0)and ((target.mon=0)or not see)then begin
+  if dwho>=0 then
+    lastwho:=dwho;
+
+  if ai and (dwho>=0)and ((target.mon=0)or not see)then begin
     target.mon:=dwho;
   end;
 
@@ -2335,6 +2471,7 @@ begin
   if (health<=0)and l then
     if (bomb>0)or(freez>0) then begin explode(dwho); freez:=0; end
     else kill(dwho);
+
 end;
 procedure tmap.randompix;
 begin
@@ -2373,8 +2510,9 @@ begin
      map.land[j]^[i].land:=map.land[j]^[i].land and (not c);
 end;
 procedure tmon.move;
-
-var i:integer;
+var
+  i:integer;
+  ldx: real;
 begin
 {  if life then }clearwall(cwall);
 
@@ -2394,8 +2532,31 @@ begin
   if freez=0 then
 begin
   if ai then moveai;
-  if kleft in key then runleft;
+  if life then
+  if kdown in key then
+  begin
+    if inwater then dy:={dy+}monster[tip].jumpy*0.5
+    else
+     if not inwall(cstand) and ((getgrid and cstand)=0) then begin
+       savedel:=0;
+       setstate(duck,0.1);
+     end
+    else
+     down:=true;
+  end
+    else down:=false;
+
+    if kleft in key then runleft;
   if kright in key then runright;
+{  if standing and not (kleft in key) and not (kleft in key)then begin
+    ldx:=dx;
+    if dx>0 then
+      dx:=dx-monster[tip].brakes*ms*sqrt(usk)*speed/mfps
+    else
+     if dx<0 then
+      dx:=dx+monster[tip].brakes*ms*sqrt(usk)*speed/mfps;
+    if ldx*dx<=0 then dx:=0;
+  end;}
 
   if delay=0 then
     IF KATACK2 in key Then
@@ -2411,28 +2572,22 @@ begin
     if kjump in key then begin
      if not inwater then jump
      else
-      dy:=-{dy+}monster[tip].jumpy*0.5;
+      dy:=-{dy+}monster[tip].jumpy*0.6;
     end;
 
   if knext in key then takenext;
   if kprev in key then takeprev;
 
-  if kdown in key then
-  begin
-    down:=true;
-    if inwater then dy:={dy+}monster[tip].jumpy*0.5;
-  end
-    else down:=false;
+
 end;
 
   tobj.move;
 
   if freez>0 then exit;
   if deldam>0 then dec(deldam);
-
   if inwall(clava) and (deldam=0) then
   begin
-    damage(mx,my,0,5,2,0,0,0,0);
+    damage(mx,my,0,5,2,0,who,0,0);
     deldam:=round(mfps/speed);
   end;
 
@@ -2441,10 +2596,11 @@ end;
    if life then
     for i:=0 to maxf do
      if f^[i].enable then
-     if (mx>=f^[i].x)and (my>=f^[i].y)and
-     (mx<=f^[i].x+f^[i].getsx)and (my<=f^[i].y+f^[i].getsy) then begin
-      if f^[i].tip=12 then damage(0,0,0,1000,0,0,hero,0,0);
-      if f^[i].tip=23 then damage(0,0,0,0,0,10,hero,0,0);
+     if (self.mx>=f^[i].x)and (self.my>=f^[i].y)and
+     (self.mx<=f^[i].x+f^[i].getsx)and (self.my<=f^[i].y+f^[i].getsy) then begin
+      if f^[i].tip=12 then
+        damage(0,0,0,1000,0,0,who,0,0);
+      if f^[i].tip=23 then damage(0,0,0,0,0,10,who,0,0);
      end;
 
   if deldam=0 then
@@ -2494,7 +2650,7 @@ end;
 {    dec(fired);}
   end;
   if fired>0 then begin
-    damage(mx,my,0,oxysec*speed/mfps,0,0,0,0,0);
+    damage(mx,my,0,oxysec*speed/mfps,100,0,-1,0,0);
     dec(fired);
     if fired<0 then fired:=0;
   end;
@@ -2508,7 +2664,8 @@ end;
 
   case curstate of
   run:begin
-       state:=run;
+       if state<>duck then
+         state:=run;
        inc(statedel);
        vis:=round(statedel/(mfps*monster[tip].runi.delay/usk))mod monster[tip].runi.max+1;
      end;
@@ -2536,7 +2693,7 @@ end;
   end;
   else if savedel>0 then begin dec(savedel); end;
   end;
-  if savedel=0 then begin state:=stand; statedel:=0; vis:=1; end;
+  if savedel=0 then begin setstate(stand,0.1); statedel:=0; vis:=1; end;
   if (state=stand)and(standing)and(not elevator)then
   begin
     if abs(dx)<monster[tip].brakes*ms2 then dx:=0 else
@@ -2600,20 +2757,20 @@ var
 begin
   min:=maxlongint{(map.x+map.y)*8*10};
   with map do
-  if rtimer.hod mod 10=(who mod 10) then begin
+  if rtimer.hod mod settings.botframe=(who mod settings.botframe) then begin
     for i:=1 to level.maxpl do begin
       j:=player[i].hero;
       if not m^[j].life then continue;
-      target.x:=round(m^[j].x);
-      target.y:=round(m^[j].y);
+      target.x:=round(m^[j].getcx);
+      target.y:=round(m^[j].getcy);
       movesee;
       d:=round(abs(m^[j].x-self.mx)+abs(m^[j].y-self.my));
       if (d<min)and see then begin min:=d; target.mon:=j; end;
     end;
 
     if  target.mon>0 then begin
-      target.x:=round(m^[target.mon].x);
-      target.y:=round(m^[target.mon].y);
+      target.x:=round(m^[target.mon].getcx);
+      target.y:=round(m^[target.mon].getcy);
       movesee;
 {      see:=true;}
 {      log('who',who);
@@ -2625,58 +2782,90 @@ begin
 //  if (not see)and not level.look and (random(300)=0)and not inwater then know:=false;
 
   if not see and inwater and know and life then begin
-     if (target.y>self.y+30) then include(key,kdown)
+     if (target.y>self.getcy+getsx*5) then include(key,kdown)
      else
-     if (target.y<self.y-30) then include(key,kjump);
+     if (target.y<self.getcy-getsx*5) then include(key,kjump);
 
-     if target.x<self.x then include(key,kleft) else include(key,kright);
+     if target.x<self.getcx then include(key,kleft) else include(key,kright);
   end;
 
   if (know){and(tar>0)} then
   begin
     if level.sniper then
     begin
-     if (dest=left)and(target.x>self.x) then include(key,kright) else
-     if (dest=right)and(target.x<self.x) then include(key,kleft);
+     if (dest=left)and(target.x>self.getcx) then include(key,kright) else
+     if (dest=right)and(target.x<self.getcx) then include(key,kleft);
     end;
     if not see then
-     if (abs(target.x-self.x)>10) then
+     if (abs(target.x-self.getcx)>10) then
      begin
-      if target.x<self.x then include(key,kleft) else include(key,kright);
+      if target.x<self.getcx then include(key,kleft) else include(key,kright);
      end
      else
     if random(300)=0 then include(key,kjump);
-    if (weap=1)or((fired>0)and(level.sniper)) then if target.x<self.x then include(key,kleft) else include(key,kright);
+    if (weap=1)or((fired>0)and(level.sniper)) then if target.x<self.getcx then include(key,kleft) else include(key,kright);
   end;
   if see then begin include(key,katack); know:=true; end;
+
+  if onhead(target.x,target.y) then begin
+     know:=true;
+     if level.sniper or clever then begin
+       include(key,katack);
+       if target.x+8<self.getcx then
+       include(key,kleft) else
+       if target.x-8>self.getcx then
+       include(key,kright);
+     end else begin
+       if target.x<self.getcx then
+       include(key,kright) else
+       if target.x>self.getcx then
+       include(key,kleft);
+       include(key,katack);
+     end;
+
+  end;
 end;
 procedure tmon.runright;
+{var
+  K: real;}
 begin
   if not life then exit;
   if monster[tip].fish and not inwater then exit;
 {  if not standing then exit;error}
-  if state<>run then setcurstate(run,0.05);
+//  if standing then k:=1 else k:=0.7;
+
+  if state<>duck then
+    if state<>run then setcurstate(run,0.05);
+
   if dest=left then dest:=right;
-  if dx<0 then dx:=dx+monster[tip].brakes*ms{2}*sqrt(usk)
+  if dx<0 then dx:=dx+monster[tip].brakes*ms{2}*sqrt(usk)*speed/mfps
   else
-   dx:=dx+monster[tip].acsel*ms{2}*sqrt(usk);
-  if dx>monster[tip].speed*ms*usk then dx:=monster[tip].speed*ms*usk;
-  if savedel<=1 then setcurstate(run,0.05);
+   dx:=dx+monster[tip].acsel*ms{2}*sqrt(usk)*speed/mfps;
+  if dx>monster[tip].speed*ms*usk{*k} then dx:=monster[tip].speed*ms*usk{*k};
+  if state<>duck then
+    if savedel<=1 then setcurstate(run,0.05);
   checkstep
 end;
 procedure tmon.runleft;
+//var
+//  K:real;
 begin
   if not life then exit;
   if monster[tip].fish and not inwater then exit;
-{  if not standing then exit;error}
-  if state<>run then setcurstate(run,0.05);
-  if dest=right then dest:=left;
-  if dx>0 then dx:=dx-monster[tip].brakes*ms{2}*sqrt(usk)
-  else
-   dx:=dx-monster[tip].acsel*ms{2}*sqrt(usk);
 
-  if dx<-monster[tip].speed*ms*usk then dx:=-monster[tip].speed*ms*usk;
-  if savedel<=1 then setcurstate(run,0.05);
+//  if standing then k:=1 else k:=0.7;
+
+  if state<>duck then
+    if state<>run then setcurstate(run,0.05);
+  if dest=right then dest:=left;
+  if dx>0 then dx:=dx-monster[tip].brakes*ms{2}*sqrt(usk)*speed/mfps
+  else
+   dx:=dx-monster[tip].acsel*ms{2}*sqrt(usk)*speed/mfps;
+
+  if dx<-monster[tip].speed*ms*usk{*k} then dx:=-monster[tip].speed*ms*usk{*k};
+
+  if state<>duck then
+    if savedel<=1 then setcurstate(run,0.05);
   checkstep
 end;
 procedure tmon.jump;
@@ -3254,7 +3443,7 @@ begin
       yp:=(p[map.pat[land.cur]].y+7) div 8;
       for i:=x1 to endd.x div 8 do
         for j:=y1 to endd.y div 8 do begin
-          map.deputpat(i,j);
+//          map.deputpat(i,j);
           if ((i-x1)mod xp=0)and((j-y1)mod yp=0)then
             map.putpat(i,j,land.cur,land.mask);
         end;
@@ -3404,12 +3593,18 @@ end;
 procedure tobj.move;
 var
   x1,y1,x2,y2,i,j,ti,tj,slx,sly,nlx,nly:longint;
-  br:boolean;
+  br,str:boolean;
   gr: byte;
 begin
   dy:=dy+getg*speed;
   savex:=x; slx:=lx;
   savey:=y; sly:=ly;
+
+  str:=false;
+  x1:=lx-getsx div 2; x2:=x1+getsx-1;  y2:=norm(0,map.y,ly);
+  if typeof(tBul)<>typeof(self) then
+  for i:=max(0,x1) to min(map.x,x2) do
+    str:=str or boolean(map.land[y2]^[i].land and cstand);
 
   upr:=false;
   br:=false;
@@ -3479,6 +3674,7 @@ begin
   gr:=getgrid;
 
   if not down then
+  if typeof(tBul)<>typeof(self) then
   for i:=max(0,x1) to min(map.x,x2) do
    if map.land[y2]^[i].land and cstand>0 then
 //   if gr and cstand>0 then
@@ -3490,7 +3686,8 @@ begin
        dy:=-dy*getupr
      else begin
        dy:=0;
-       y:=round(y)div 8 *8-1{-28*speed/mfps};
+      if not str then  y:=round(y)div 8 *8-1
+      else y:=y-28*speed/mfps;
      end;
 
      my:=round(y);
@@ -3582,6 +3779,7 @@ begin
    die:  p[monster[tip].die[vis,dest]].spritesp(mx-ax,my-ay);
    crash:p[monster[tip].bomb[vis,dest]].spritesp(mx-ax,my-ay);
    hai:  p[monster[tip].hai[dest]].spriteo(mx-ax,my-ay,c);
+   duck:  p[monster[tip].duck[dest]].spriteo(mx-ax,my-ay,c);
   end;
 //  dec(my);
 {  putpixel(mx-ax,my-ay,white);}
@@ -3609,12 +3807,12 @@ begin
   case state of
    run,stand,fire,hack,hai: getsy:=monster[tip].y;
    die,crash: getsy:=1;
+   duck: getsy:=monster[tip].y div 2;
   end;
 end;
 procedure tmon.init(ax,ay,adx,ady:real; at:tmaxmontip; ad:tdest; aw:longint; aai,af:boolean; ah:longint);
 begin
   fillchar(bul,sizeof(bul),0);
-  fillchar(w,sizeof(w),0);
   tobj.init(ax,ay,adx,ady,af);
   g:=map.g;
   longjump:=1;
@@ -3634,6 +3832,7 @@ begin
   delay:=0; deldam:=0; oxy:=100; oxylife:=0;
   ai:=aai;
   who:=aw;
+  lastwho:=-1;
   life:=true;
   dest:=ad;
 //  if (integer(dest)<0)or(integer(dest)>2)then dest:=left;
@@ -3650,18 +3849,20 @@ begin
   false: takeitem(freeitem);
   true: takeitem(freemultiitem);
   end;
-  if ai then takeitem(monster[tip].defitem)
-        else
-  begin
+  if ai then begin
+    takeitem(monster[tip].defitem);
+    weap:=it[monster[tip].defitem].weapon;
+  end else begin
     if not level.death then begin
       takeitem(playdefitem);
-//      weap:=it[playdefitem].weapon;
+      weap:=it[playdefitem].weapon;
     end
     else begin
       takeitem(multiitem);
-//      weap:=it[multiitem].weapon;
+      weap:=it[multiitem].weapon;
     end
   end;
+
   mx:=round(x); my:=round(y);
   dx:=0; dy:=0;
   know:=false; see:=false;
@@ -3732,6 +3933,7 @@ begin
       r:=(map.land[j]^[i].land) or r;
   getgrid:=r;
 end;
+
 
 function tobj.inwall(c:byte):boolean;
 var
@@ -4195,6 +4397,7 @@ end;
 procedure tmap.clear;
 var i:integer;
 begin
+  fillchar(must, sizeof(must), 0);
   fillchar(m^,sizeof(m^),0);        for i:=0 to maxmon do m^[i].newObj;
   fillchar(item^,sizeof(item^),0);  for i:=0 to maxitem do item^[i].newObj;
   fillchar(f^,sizeof(f^),0);        for i:=0 to maxf do f^[i].newObj;
@@ -4354,6 +4557,7 @@ begin
     0: begin maxallpl:=0; level.maxpl:=0; exit; end;
   end;
   fillchar(bot,sizeof(bot),0);
+  fillchar(scrc,sizeof(scrc),0);
   for i:=1 to maxplays do begin
     bot[i]:=1;
 //    bot[i]:=tip[i];
@@ -4393,6 +4597,7 @@ begin
   men[9]:='8 ботов';
   level.maxpl:=menu(bots+1,bots+1,'Боты')-1;
   maxallpl:=mans+level.maxpl;
+  bots:=maxallpl-mans;
 
   if mans=0 then
   case bots of
@@ -4520,6 +4725,8 @@ begin
     close(f);
   end;
   getsave:=menu(max,1,title);
+  time.clear;
+  rtimer.clear;
 end;
 
 const
@@ -4696,7 +4903,7 @@ begin
          level.editor:=false;
          level.multi:=false;
          level.death:=false;
-         maxallpl:=1;
+         maxallpl:=1; winall:=false;
          bot[1]:=0;
          scrc[1]:=all;
          level.setup;
@@ -4707,7 +4914,7 @@ begin
          botmenu;
          if maxallpl=0 then continue;
          first:=level.skill<>0;
-         level.cur:=0;editor:=false; multi:=true; death:=false;
+         level.cur:=0;editor:=false; multi:=true; death:=false; winall:=false;
          level.setup;
        end;
     3: begin // DeathMatch
@@ -4715,7 +4922,7 @@ begin
          level.skill:=skillmenu;
          botmenu;
          if maxallpl=0 then continue;
-
+         winall:=false;
          first:=level.skill<>0;
          if first then
          begin
@@ -4730,7 +4937,7 @@ begin
          end else continue;
        end;
     4: begin loadgame(getsave('загрузить')); if loaded then break; end;
-    5: begin debug:=true; editor:=true;first:=true;end;
+    5: begin winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;end;
     0,6: begin endgame:=true; first:=true;end;
    end;
  until level.first;
@@ -4826,7 +5033,7 @@ end;
 
 procedure movemouse;
 begin
-    mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3;
+    mx:=mouse.x;  my:=mouse.y; push:=mouse.push; push2:=mouse.push2;push3:=mouse.push3 or pkey[59];
 //    add:=7;
     {    case res of
      0,1: add:=1;
@@ -4929,14 +5136,14 @@ begin
        if (pos('iddqd',keybuf)>0) then
          begin
            for i:=1 to level.maxpl do
-              map.m^[player[i].hero].damage(map.m^[player[i].hero].mx,map.m^[player[i].hero].my,0,10000,100,0,0,0,-5);
+              map.m^[player[i].hero].damage(map.m^[player[i].hero].mx,map.m^[player[i].hero].my,0,10000,100,0,-1,0,-5);
            keybuf:='';
           end;
        if (pos('kill',keybuf)>0) then
          begin
            for i:=0 to maxmon do
              if map.m^[i].life and (map.m^[i].hero=0)then
-              map.m^[i].damage(map.m^[i].mx,map.m^[i].my,0,10000,100,0,0,0,-5);
+              map.m^[i].damage(map.m^[i].mx,map.m^[i].my,0,10000,100,0,-1,0,-5);
            keybuf:='';
           end;
        if pos('all',keybuf)>0 then
@@ -4975,6 +5182,7 @@ begin
       level.endgame or (pkey[1{Esc}]and unpush);
     if not pkey[1] then unpush:=true;
 
+  if not level.editor then begin
     if not level.multi then
       level.endgame:=level.endgame or player[1].lose or player[1].win
      else
@@ -5052,7 +5260,14 @@ begin
         end;
       end;
     end;
-   end;
+  end;
+  end;
+  if level.editor and level.endgame then
+    begin
+       gamemenu;
+       time.clear;
+       rtimer.clear;
+     end;
 end;
 
 procedure checktimer;
@@ -5099,6 +5314,8 @@ if ioresult<>0 then begin writeln('WARNING: doom.ini not fund; default mod = RF'
       if s1='mainmod' then mainmod:=s2;
       if s1='runmod' then runmod:=s2;
       if s1='title' then title:=s2;
+      if s1='botdelay' then runmod:=s2;
+      if s1='mondelaytitle' then title:=s2;
     end;
   end;
   close(f);
@@ -5128,6 +5345,14 @@ begin
   pnode:=loadbmp('node');  pnodei:=loadbmp('nodei');  pnodeg:=loadbmp('nodeg');
   for i:=0 to 9 do d[i]:=loadbmp('d'+st(i)); dminus:=loadbmp('dminus'); dpercent:=loadbmp('dpercent');
   cur:=loadbmp('cursor');
+  botcol[1]:=white;
+  botcol[2]:=yellow;
+  botcol[3]:=green;
+  botcol[4]:=blue;
+  botcol[5]:=red;
+  botcol[6]:=red;
+  botcol[7]:=red;
+  botcol[8]:=red;
 
   {Init Screen...}
 
@@ -5177,7 +5402,7 @@ begin
     ddx:=6; ddy:=6;  Sensetivity(12,12);
   end;
   mousebox(0,0,getmaxx,getmaxy); loaded:=false;
-  unpush:=false; scrmode:=normal; hod:=0; info.clear; speed:=1;
+  unpush:=false; scrmode:=normal; hod:=0;  speed:=1;
   repeat
     rtimer.move; time.move; inc(hod);
     movemouse;
@@ -5190,6 +5415,7 @@ begin
       for i:=1 to level.maxpl do player[i].draw;
       info.draw(1,1);
     end else begin
+      while keypressed do readkey;
       clear;
       ed.move;
       map.move;
@@ -5198,7 +5424,7 @@ begin
     end;
 
     rb.print(getmaxx-24,getmaxy-8,st0(round(rtimer.fps),3));
-    rb.print(getmaxx-24,getmaxy-16,st0(round(speed*10),3));
+//    rb.print(getmaxx-24,getmaxy-16,st0(round(speed*10),3));
 
     case scrmode of
       normal: screen;
@@ -5207,7 +5433,7 @@ begin
       reverse: screenr;
     end;
 
-//    crt.delay(100);
+//    crt.delay(200);
 
     checktimer;
     checkwingame;
