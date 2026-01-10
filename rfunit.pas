@@ -214,6 +214,9 @@ function bmpexist(s:string):boolean;
 var
   i:integer;
 begin
+  // Check PNG first (priority), then BMP
+  for i:=1 to maxs do
+    if fexist(sdir[i]+s+'.png') then begin bmpexist:=true; exit; end;
   for i:=1 to maxs do
     if fexist(sdir[i]+s+'.bmp') then begin bmpexist:=true; exit; end;
   bmpexist:=false;
@@ -223,6 +226,12 @@ function findbmp(s:string):string;
 var
   i:integer;
 begin
+  // Check PNG first (priority), then BMP
+  for i:=maxs downto 1 do
+    if fexist(sdir[i]+s+'.png') then begin
+      findbmp:=sdir[i]+s+'.png';
+      exit;
+    end;
   for i:=maxs downto 1 do
     if fexist(sdir[i]+s+'.bmp') then begin
       findbmp:=sdir[i]+s+'.bmp';

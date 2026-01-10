@@ -7,7 +7,7 @@ unit sdlgraph;
 
 interface
 
-uses sdl2, sysutils;
+uses sdl2, sdl2_image, sysutils;
 
 const
   // Screen constants
@@ -38,6 +38,7 @@ var
   green: color = 2;
   yellow: color = 14;
   fon: color = 0;
+  palLoaded: boolean = false;
 
   // Screen buffer
   scr: array[0..maximumy-1, 0..maximumx-1] of color;
@@ -192,6 +193,7 @@ begin
   Seek(ff, 54);  // Skip BMP header
   BlockRead(ff, pal, 256*4);
   Close(ff);
+  palLoaded := true;
 
   // Update SDL palette
   UpdateSDLPalette;
@@ -264,6 +266,9 @@ begin
       WriteLn('SDL_Init failed: ', SDL_GetError);
       Halt(1);
     end;
+    // Initialize SDL2_image for PNG support
+    if IMG_Init(IMG_INIT_PNG) = 0 then
+      WriteLn('IMG_Init warning: ', IMG_GetError);
     sdlInitialized := true;
   end;
 

@@ -306,13 +306,17 @@ end;
 procedure twad.loadpal;
 var
   e:tel;
-//  p:array[0..256*3-1]of byte;
+  rgb:array[0..2]of byte;
   i:integer;
 begin
   e.assign(f,tab+getel('PLAYPAL')*16);
-//  for i:=0 to 255 do
-//    e.read(f,pal[i*4],3);
-  e.read(f,pal,256*4);
+  for i:=0 to 255 do begin
+    e.read(f,rgb,3);  // Read RGB from Doom PLAYPAL
+    pal[i*4+0]:=rgb[2]; // B
+    pal[i*4+1]:=rgb[1]; // G
+    pal[i*4+2]:=rgb[0]; // R
+    pal[i*4+3]:=0;      // A
+  end;
 {  port[$3c8]:=0;
   for i:=0 to 255 do
   begin
