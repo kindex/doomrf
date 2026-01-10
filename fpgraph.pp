@@ -1,12 +1,12 @@
 unit fpgraph; // Graph unit for FPC, Based on standart graph.ppu + mygraph.tpu
 // Resolutions: 640x480x256 - 1024x768x64K
 // ~70 fps (clear&screen) on 300 Mhz [640x480x64K-base resolution]
-// Andrey Ivanov kindex@mail.lv / DiVision / 9.2001
+// Andrey Ivanov kindexz@gmail.com / DiVision / 9.2001
 interface
   { $Define high} {High color}
 const
   bit:array[1..3]of longint=(256,65536,256*256*256 {Not supported by FPC});
-  maximumx=800; // When realise -> 1024x768
+  maximumx=800; // When release -> 1024x768
   maximumy=600;
   block=65536;
 type

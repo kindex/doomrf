@@ -229,8 +229,8 @@ type
      procedure move; virtual;
      procedure checkstep;
      procedure damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
-     procedure setstate(as:tstate; ad: real);
-     procedure setcurstate(as:tstate; ad: real);
+     procedure setstate(astate:tstate; ad: real);
+     procedure setcurstate(astate:tstate; ad: real);
      procedure kill(dwho: integer);
      procedure explode(dwho: integer);
      procedure giveweapon;
@@ -431,7 +431,7 @@ type
     end;
     ml: integer;
     procedure clear;
-    procedure add(as:string; ac:color; at:real);
+    procedure add(astr:string; ac:color; at:real);
     procedure move;
     procedure draw(ax,ay: integer);
     procedure delete(a:integer);
@@ -504,7 +504,7 @@ begin
 end;
 procedure ttime.init(a: real {sec});
 begin
-  fin:=time.tik+round(a*tpr);
+  fin:=time.tik+round(a*tps);
   if a<0 then fin:=maxlongint;
 end;
 procedure ttime.clear;
@@ -514,7 +514,7 @@ end;
 procedure ttime.add(a: real {sec});
 begin
   if ready then fin:=time.tik;
-  fin:=fin+{time.tik+}round(a*tpr);
+  fin:=fin+{time.tik+}round(a*tps);
   if a<0 then fin:=maxlongint;
 end;
 function ttime.ready: boolean;
@@ -527,7 +527,7 @@ begin
 end;
 function ttime.getest: real;
 begin
-  getest:=(fin-time.tik)/tpr;
+  getest:=(fin-time.tik)/tps;
 end;
 
 procedure outtro;
@@ -573,10 +573,10 @@ end;
 procedure tinfo.add;
 begin
   if not level.started then exit;
-  if as='' then exit;
+  if astr='' then exit;
   if ml=maxl then delete(1);
   inc(ml);
-  l[ml].s:=as;
+  l[ml].s:=astr;
   l[ml].c:=ac;
 //  if speed<>0 then
   l[ml].time.init(at);
@@ -750,6 +750,7 @@ begin
     if y1<30 then y1:=30;
     if (y1+(ch-1)*d>getmaxy-30)then y1:=-(ch-1)*d+getmaxy-30;
     draw;
+    if quit_requested then break;
     if keypressed then
     case readkey of
       #13: enter:=ch;
@@ -762,7 +763,7 @@ begin
         #81: {PgDn} ch:=max;
        end;
     end;
-  until enter>0;
+  until (enter>0) or quit_requested;
   menu:=enter;
   while keypressed do readkey;
 end;
@@ -990,8 +991,8 @@ begin
     digit(300+wb.width(items),18,round(player[1].taken/map.totitem*100),'%');
     end;
 
-    wb.print(100, 50, Times+strtime(round((time.tik-level.start)/tpr)));
-    wb.print(100, 80, allTimes+strtime(round((level.alltime)/tpr)));
+    wb.print(100, 50, Times+strtime(round((time.tik-level.start)/tps)));
+    wb.print(100, 80, allTimes+strtime(round((level.alltime)/tps)));
     screen;
     delay(del);
   end;
@@ -2596,19 +2597,19 @@ var
 begin
   if not life then exit;
   last:=state;
-  state:=as;
+  state:=astate;
   if inwall(cwall) and (last=duck) then state:=duck
   else
    savedel:=round(ad*mfps/speed);
 //   savedel.init(ad);
 end;
-procedure tmon.setcurstate(as:tstate; ad: real);
+procedure tmon.setcurstate(astate:tstate; ad: real);
 var
   last: tstate;
 begin
   if not life then exit;
   last:=curstate;
-  curstate:=as;
+  curstate:=astate;
   if inwall(cwall) and (last=duck) then curstate:=duck
   else
    savedel:=round(ad*mfps/speed);
@@ -4647,8 +4648,10 @@ begin
   if ver>0 then
   begin
 
-    if ver>=4 then
+    if ver>=4 then begin
       blockread(ff,mmsg,4);
+      if (mmsg < 0) or (mmsg > maxmsg) then mmsg:=0;  // Validate mmsg
+    end;
 
     blockread(ff,mnode,4);
     blockread(ff,reserved,16);
@@ -4738,8 +4741,11 @@ begin
       wlp:=loadasbmp(wallpaper);
   end;
   if ver>=4 then begin
+    {$I-}
     for i:=0 to mmsg-1 do
       blockread(ff,msg[i],sizeof(msg[i]));
+    if ioresult<>0 then; // Ignore read errors for messages (backwards compatibility)
+    {$I+}
   end;
   close(ff);
   setfattr(ff,attr);
@@ -5382,7 +5388,7 @@ begin
   c:='SAVE';
   blockwrite(ff,c,4);
 
-  s:=level.name[level.cur]+{' - '+strtime(round(time.tik/tpr))+}' - '+strtime(round((level.curtime-level.start)/tpr));
+  s:=level.name[level.cur]+{' - '+strtime(round(time.tik/tps))+}' - '+strtime(round((level.curtime-level.start)/tps));
 
   blockwrite(ff,s,256);
   xorwrite(ff,curmod,32);
@@ -6212,9 +6218,9 @@ begin
 
     checktimer;
     checkwingame;
-  until level.endgame or winall;
+  until level.endgame or winall or quit_requested;
   winall:=false;
- until false;
+ until quit_requested;
   {End game}
   closegraph;
 //  map.done;

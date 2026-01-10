@@ -211,12 +211,40 @@ begin
 
       SDL_KEYDOWN:
       begin
-        // Add to key buffer for ReadKey
-        ch := SDLKeyToChar(event.key.keysym);
-        if ch <> #0 then
-        begin
-          keyBuffer[keyHead] := ch;
-          keyHead := (keyHead + 1) mod 256;
+        // Handle extended keys (arrows, function keys) - DOS style: #0 + scancode
+        case event.key.keysym.sym of
+          SDLK_UP: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #72; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_DOWN: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #80; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_LEFT: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #75; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_RIGHT: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #77; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_PAGEUP: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #73; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_PAGEDOWN: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #81; keyHead := (keyHead + 1) mod 256;
+          end;
+        else
+          // Regular keys
+          ch := SDLKeyToChar(event.key.keysym);
+          if ch <> #0 then
+          begin
+            keyBuffer[keyHead] := ch;
+            keyHead := (keyHead + 1) mod 256;
+          end;
         end;
       end;
 
