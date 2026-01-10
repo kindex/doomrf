@@ -5145,12 +5145,12 @@ procedure botmenu;
 var
   r,p,i,bots,mans:integer;
 begin
-  men[1]:='���쪮 ����';
-  men[2]:='1 ��ப';
-  men[3]:='2 ��ப�';
-  men[4]:='3 ��ப�';
-  men[5]:='4 ��ப�';
-  r:=menu(5,3,'��ப�');
+  men[1]:='Single';
+  men[2]:='1 player';
+  men[3]:='2 players';
+  men[4]:='3 players';
+  men[5]:='4 players';
+  r:=menu(5,3,'Players');
   case r of
     1: p:=0;
     2: p:=1;
@@ -5188,17 +5188,17 @@ begin
   end;
   mans:=level.maxpl;
   bots:=maxplays-level.maxpl;
-  if level.maxpl>0 then men[1]:='��� ��⮢'
-  else men[1]:='�⬥��';
-  men[2]:='1 ���';
-  men[3]:='2 ���';
-  men[4]:='3 ���';
-  men[5]:='4 ���';
-  men[6]:='5 ��⮢';
-  men[7]:='6 ��⮢';
-  men[8]:='7 ��⮢';
-  men[9]:='8 ��⮢';
-  level.maxpl:=menu(bots+1,bots+1,'����')-1;
+  if level.maxpl>0 then men[1]:='No bots'
+  else men[1]:='Cancel';
+  men[2]:='1 bot';
+  men[3]:='2 bots';
+  men[4]:='3 bots';
+  men[5]:='4 bots';
+  men[6]:='5 bots';
+  men[7]:='6 bots';
+  men[8]:='7 bots';
+  men[9]:='8 bots';
+  level.maxpl:=menu(bots+1,bots+1,'Bots')-1;
   maxallpl:=mans+level.maxpl;
   bots:=maxallpl-mans;
 
@@ -5283,7 +5283,7 @@ begin
     findnext(g);
 //    if not ok then dec(s);
   end;
-  s:=menu(s,1,'����');
+  s:=menu(s,1,'Mods');
   if s<>0 then
     loadmod(c[s]);
 end;
@@ -5302,12 +5302,12 @@ end;
 function skillmenu:integer;
 var s:integer;
 begin
-  men[1]:='��� ��७�� ९�';
-  men[2]:='��� ᥫ�᪮� ���⭮��';
-  men[3]:='��ଠ';
-  men[4]:='�����';
-  men[5]:='��謠�';
-  s:=menu(5,3,'���������');
+  men[1]:='Easy';
+  men[2]:='Medium';
+  men[3]:='Normal';
+  men[4]:='Hard';
+  men[5]:='Nightmare';
+  s:=menu(5,3,'Difficulty');
   skillmenu:=s;
   normskill(s);
 {  with level do
@@ -5333,7 +5333,7 @@ begin
      assign(f,savedir+'save'+st(i)+'.sav');
     {$i-}reset(f,1);
     {$i+}
-    if ioresult<>0 then begin men[i]:='����'; continue; end;
+    if ioresult<>0 then begin men[i]:='Empty'; continue; end;
     blockread(f,c,4);
     blockread(f,s,256);
     men[i]:=s;
@@ -5482,15 +5482,15 @@ begin
 
   level.endgame:=false;
   mm:=4; if level.death then mm:=5;
-  men[1]:='�த������';
-  men[2]:='��࠭���';
-  men[3]:='����㧨��';
-  men[4]:='������� ����';
-  men[5]:='��砩�� �஢���';
+  men[1]:='Continue';
+  men[2]:='Save';
+  men[3]:='Load';
+  men[4]:='Main menu';
+  men[5]:='Random level';
   case menu(mm,1,'') of
    0,1: level.endgame:=false;
-   2: savegame(getsave('��࠭���'));
-   3: loadgame(getsave('����㧨��'));
+   2: savegame(getsave('Save'));
+   3: loadgame(getsave('Load'));
    4: level.endgame:=true;
    5: player[1].win:=true;
   end;
@@ -5507,8 +5507,8 @@ begin
 
   level.endgame:=false;
 
-  men[1]:='�த������';
-  men[2]:='������� ����';
+  men[1]:='Continue';
+  men[2]:='Main menu';
   case menu(2,1,'') of
    0,1: level.endgame:=false;
 //   2: savegame(getsave('��࠭���'));
@@ -5534,13 +5534,13 @@ begin
  loaded:=false;
  repeat
    level.first:=false;
-   men[1]:='���� ��ப';
-   men[2]:='�७�஢��';
-   men[3]:='�����';
-   men[4]:='���';
-   men[5]:='����㧨��';
-   men[6]:='।����';
-   men[7]:='��室';
+   men[1]:='New game';
+   men[2]:='Training';
+   men[3]:='Network';
+   men[4]:='Deathmatch';
+   men[5]:='Load';
+   men[6]:='Editor';
+   men[7]:='Exit';
    with level do
    case menu(7,1,'') of
     1: begin // Single player game
@@ -5611,7 +5611,7 @@ begin
            end else continue;
          end else continue;
        end;
-    5: begin loadgame(getsave('����㧨��')); if loaded then break; end;
+    5: begin loadgame(getsave('Load')); if loaded then break; end;
     6: begin level.cheater:=false;
         winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;end;
     0,7: begin endgame:=true; first:=true;end;
@@ -5755,9 +5755,9 @@ begin
      if unpush then begin si:=not si; unpush:=false; end;
 
    if pkey[60 {F2}]then
-     savegame(getsave('��࠭���'));
+     savegame(getsave('Save'));
    if pkey[61 {F3}]then
-     loadgame(getsave('����㧨��'));
+     loadgame(getsave('Load'));
    if (not level.death) then begin
     if pkey[44{Z}] then
       for i:=2 to level.maxpl do
