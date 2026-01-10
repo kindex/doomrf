@@ -1,6 +1,6 @@
 Unit Sprites; { $define high} {$define ignorecase}
 interface
-uses fpgraph;
+uses sdlgraph;
 const
   maxdots=1024*1024*bpp;
   maxpat=2048;
@@ -9,7 +9,7 @@ type
   tnpat=0..maxpat;
   filename=string[32];
   tsign=array[1..2]of char;
-  tbmpfmt=record
+  tbmpfmt=packed record
      Sign:tsign;  // BM
      Size  : longint;   {X*Y+FMT+PAL}
      Reserved1,Reserved2 : word;
@@ -59,7 +59,7 @@ type
     procedure reverse;
   end;
   sprtable=array[0..maxdots]of word; // XYLCCCCXYLCCC...
-  { ¯® 2 ¡ ©â  /    L    \
+  { ï¿½ï¿½ 2 ï¿½ï¿½ï¿½ï¿½ /    L    \
     X1 Y1 L1 : CC CC CC CC
     X2 Y2 L2 : CC CC CC ...
   }
@@ -131,14 +131,21 @@ end;
 function tbmp.loadwad(s:string):boolean;
 var
   dx,dy,i,j:longint;
+  wx,wy,wdx,wdy:word;
   t:array[0..1024*2{Or more- max x}] of byte;
 begin
   if x>0 then done;
 
   name:=s;
   aw.assign(name);
-  aw.read(x,2); aw.read(y,2);
-  aw.read(dx,2); aw.read(dy,2);
+  aw.read(wx,2); aw.read(wy,2);
+  aw.read(wdx,2); aw.read(wdy,2);
+  x:=wx; y:=wy; dx:=wdx; dy:=wdy;
+
+  // Validate dimensions
+  if (x<=0)or(y<=0)or(x>2048)or(y>2048) then begin
+    x:=0; y:=0; loadwad:=false; error:=1; exit;
+  end;
 
   {$ifndef high}
   initdata8(x,y);
@@ -147,9 +154,9 @@ begin
     aw.read(bmp^,x*y);
     loadwad:=true;
     tag:=ibmp;
+    error:=0;
   end
-  else begin x:=0; y:=0; loadwad:=false; end;
-  error:=0;
+  else begin donedata; loadwad:=false; error:=1; end;
   {$else high}
   initdata(x,y);
   if (w.cur.l=longint(x)*longint(y)+8) then
@@ -243,8 +250,8 @@ end;
 function getfilename(n:string):string;
 begin
   {$ifdef ignorecase} n:=downcase(n); {$endif}
-  while pos('\',n)<>0 do
-    n:=copy(n,pos('\',n)+1,length(n));
+  while pos('/',n)<>0 do
+    n:=copy(n,pos('/',n)+1,length(n));
   if pos('.',n)=0 then getfilename:=n else getfilename:=copy(n,1,pos('.',n)-1);
 end;
 
@@ -271,7 +278,7 @@ begin
      end;
   end;
   target:=left;
-  if x=0 then error:=1 else error:=0;//if x=0 then load:=false;
+  if x=0 then error:=1 else error:=0;
 end;
 
 procedure tbmp.loadfile(a:string);
@@ -344,7 +351,7 @@ var
   t:array[0..1024*2*3{Or more- max x}] of byte;
 begin
   seek(f,fmt.fmtsize);
-  bpl:=fmt.imagesize div y-x*3; // Žáâ â®ª
+  bpl:=fmt.imagesize div y-x*3; // ï¿½ï¿½ï¿½â®ª
   for i:=y-1 downto 0 do begin
     blockread(f,t,x*3);
     if bpl<>0 then blockread(f,null,bpl);
@@ -363,12 +370,14 @@ begin
 end;
 procedure tbmp.initdata(ax,ay:longint);
 begin
+  x:=ax; y:=ay;
   bmpsize:=x*y*bpp;
   xl:=x*bpp;
   getmem(bmp,bmpsize);
 end;
 procedure tbmp.initdata8(ax,ay:longint);
 begin
+  x:=ax; y:=ay;
   bmpsize:=x*y;
   xl:=x;
   getmem(bmp,bmpsize);
@@ -500,10 +509,10 @@ begin
 
      move(spr^[ss+3],t,l);
 
-     for j:=0 to l-1 do
-       t[j]:=blu[t[j]];
+     // blu color modulation not implemented in SDL2
+     // for j:=0 to l-1 do t[j]:=blu[t[j]];
 
-     fpgraph .sprite(t{spr^[ss+3]},ax+sx,ay+sy,l);
+     sdlgraph.sprite(t{spr^[ss+3]},ax+sx,ay+sy,l);
      {$ifndef high}
      l:=l + l mod 2;
      l:=l div 2;
@@ -523,7 +532,7 @@ begin
     sy:=spr^[ss+1];
 //    if sy+ay>max.y then break;
      l:=spr^[ss+2];
-     fpgraph.sprite(spr^[ss+3],ax+sx,ay+sy,l);
+     sdlgraph.sprite(spr^[ss+3],ax+sx,ay+sy,l);
      {$ifndef high}
      l:=l + l mod 2;
      l:=l div 2;
@@ -546,7 +555,7 @@ begin
 //    if sy+ay>max.y then break;
      l:=spr^[ss+2];
      putpixel(ax+sx-1,ay+sy,c);
-     fpgraph.sprite(spr^[ss+3],ax+sx,ay+sy,l);
+     sdlgraph.sprite(spr^[ss+3],ax+sx,ay+sy,l);
      putpixel(ax+sx+l,ay+sy,c);
      {$ifndef high}
      l:=l + l*bpp mod 2;
@@ -574,6 +583,7 @@ begin
   case tag of
   iSpr: tspr.donedata;
   iBmp: tBmp.donedata;
+  else begin x:=0; y:=0; bmp:=nil; bmpsize:=0; end;
   end;
   name:='';
 end;
@@ -653,7 +663,7 @@ begin
       ny:=round(c*cy+cx*s)+dy;
       if (nx>=0)and(nx<x)and(ny>=0)and(ny<y)then begin
         col:=bmp^[nx+ny*x];
-        if col<>0 then fpgraph.putpixel(ax-dx+i,ay-dy+j,col);
+        if col<>0 then sdlgraph.putpixel(ax-dx+i,ay-dy+j,col);
       end;
     end;
 end;

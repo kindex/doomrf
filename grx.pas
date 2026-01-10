@@ -1,7 +1,7 @@
 { $mode tp}
 unit grx;
 interface
-Uses crt,wads, timer, ports, fpgraph,api,sprites;
+Uses sdlinput,wads, sdltimer, sdlgraph,api,sprites;
 type
   tname=string[16];
 
@@ -26,14 +26,14 @@ const
    );}
   load:array[1..8]of string[40]=
   (
-  #13#10'Боты (bot.ini) ...',
-  #13#10'Стены (wall.dat)'  ,
-  #13#10'Взрывы (bomb.ini)' ,
-  #13#10'Пули (bullet.ini)' ,
-  #13#10'Оружие (weapon.ini)',
-  #13#10'Предметы (item.ini)',
-  #13#10'Монстры (monster.ini)',
-#13#10'Остальное (func.ini, bitmaps)'
+  #13#10'я┐╜я┐╜я┐╜я┐╜ (bot.ini) ...',
+  #13#10'я┐╜теня┐╜ (wall.dat)'  ,
+  #13#10'я┐╜я┐╜я┐╜я┐╜я┐╜ (bomb.ini)' ,
+  #13#10'я┐╜ули (bullet.ini)' ,
+  #13#10'я┐╜я┐╜ужия┐╜ (weapon.ini)',
+  #13#10'я┐╜редя┐╜я┐╜я┐╜я┐╜ (item.ini)',
+  #13#10'я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ (monster.ini)',
+#13#10'я┐╜я┐╜тальноя┐╜ (func.ini, bitmaps)'
   );
 type
   tcaption=array[1..4]of char;
@@ -92,7 +92,7 @@ type
     procedure done;
   end;}
 //  tpat=tspr;
-//  arrayoftpat=array[tnpat]of tpat; {текстуры}
+//  arrayoftpat=array[tnpat]of tpat; {текя┐╜я┐╜я┐╜я┐╜я┐╜}
 //  tscreen=array[0..1200]of ^tarray;
   tfont=object
      vis: string[8];
@@ -683,7 +683,7 @@ var
   i:integer;
 begin
   repeat
-    i:=pos('\',s);
+    i:=pos('/',s);
     if i=0 then break;
     s:=copy(s,i+1,length(s)-i);
   until false;
@@ -700,14 +700,7 @@ if ioresult<>0 then exit;
   seek(ff,54);
   blockread(ff,pal,256*4);
   close(ff);
-  port[$3c8]:=0;
-  c:=255; max:=0;
-  for i:=0 to 255 do
-  begin
-(*r*)  port[$3c9]:=pal[(i*4)+2] div 4;
-(*g*)  port[$3c9]:=pal[(i*4)+1] div 4;
-(*b*)  port[$3c9]:=pal[(i*4)+0] div 4;
-  end;
+  setpal;
   white:=getcolor(255,255,255);
   red:=getcolor(255,0,0);
   green:=getcolor(0,255,0);
