@@ -5383,6 +5383,7 @@ var
   i: integer;
 begin
   if a=0 then exit;
+  ForceDirectories(savedir);
   assign(ff,savedir+'save'+st(a)+'.sav');
   rewrite(ff,1);
   c:='SAVE';
