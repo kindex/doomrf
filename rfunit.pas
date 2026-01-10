@@ -1,7 +1,6 @@
-{$A+,B+,D+,E-,F-,G+,I+,L+,N+,P-,Q-,R-,S-,T-,V+,X+,Y+ Final}
 unit rfunit;
 interface
-uses api,grx,crt,ports,sprites,dos ;
+uses api,grx,sdlinput,sprites,sdlgraph;
 const
   maxsdir=16;
 
@@ -9,17 +8,17 @@ const
   mainmod:string='RF';
   runmod:string='RF';
   tit:array[1..maxtit]of string=(
-  'Copyright DiVision ','>--=[■]=--<','^ ^',
+  'Copyright DiVision ','>--=[я┐╜]=--<','^ ^',
   'PRG',
-  'Andrey Ivanov "kIndeX[MMX]" kindex@mail.lv',
+  'Andrey Ivanov "KindeX[MMX]" kindexz@gmail.com',
   'Levels & Design',
   'Alexander Rodionov "Dark Sirius[MMX]"',
   'Pavel Burakov "Zonik[MMX]"',
-  'Viktor Ivanov "StA[MMX]"'
+  ''
   );
 
 var
-  debug:boolean;
+  debug:boolean = true;
   s,o: longint; // Keyboard mem[s:o]
 type
   tbot=record
@@ -49,8 +48,8 @@ const
   ppm=14; {pixel per meter (from plays.bmp)}
   ms=ppm/30; { meter/sec}
   ms2=ms/30; { meter/sec2}
-  maininidir:string[32]='RF\ini\';
-  inidir:string[32]='RF\ini\';
+  maininidir:string[32]='RF/ini/';
+  inidir:string[32]='RF/ini/';
   maxmust=256;
   maxit=96;
   maxf=128;  maxarraypix=512;  maxpul=512;  maxexpl=64;  maxmontip=64;
@@ -161,7 +160,6 @@ function crc(a:string):longint;
 procedure checkcrc(a:string);
 
 (****************************************************)implementation
-uses go32;
 var
   buf: array[0..32000]of byte;
 
@@ -190,7 +188,7 @@ var
   c,cr: longint;
 
 begin
-  if ((runmod<>'RF')and(runmod<>'DOOM'))or debug then exit;
+  if ((runmod<>'RF')and(runmod<>'Doom'))or debug then exit;
   c:=crc(a);
   b:=a;
   b[length(b)-0]:='C';
@@ -236,34 +234,27 @@ end;
 procedure addsdir(s:string);
 begin
   inc(maxs);
-  sdir[maxs]:=s+'\';
-  writeln('Using BMP directory ',s+'\');
+  sdir[maxs]:=s+'/';
+  writeln('Using BMP directory ',s+'/');
 end;
 
 procedure manualinfo;
 begin
-  textattr:=15;
-  writeln('Управление : 1(Center) 2(Left)  3(PAD)  4(Mouse)    ');
-  writeln('Вправо     : Right     D        PgDn    Left        ');
-  writeln('Влево      : Left      A        End     Right       ');
-  writeln('Прыжок     : Up        W        Pad 5   Up          ');
-  writeln('Вниз       : Down      S        Ins     Down        ');
-  writeln('Стрелять   : Ctrl      Tab      +       Left Button ');
-  writeln('Стрелять2  : Alt       CapsLock Num Lock            ');
-  writeln('ПредОружие : Shift     Q        *                   ');
-  writeln('СледОружие : Enter     ~        -       Right Button');
-  textattr:=14;
-  writeln('Управление ботами: Z-за мной  X-охранять позицию  C-вольно V - смирно!');
-  writeln('F2 - сохранить  F3 - загрузить');
-  textattr:=7;
+  writeln('я┐╜я┐╜равя┐╜я┐╜я┐╜я┐╜я┐╜ : 1(Center) 2(Left)  3(PAD)  4(Mouse)    ');
+  writeln('я┐╜я┐╜равя┐╜     : Right     D        PgDn    Left        ');
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜      : Left      A        End     Right       ');
+  writeln('я┐╜я┐╜ыжоя┐╜     : Up        W        Pad 5   Up          ');
+  writeln('я┐╜я┐╜я┐╜я┐╜       : Down      S        Ins     Down        ');
+  writeln('я┐╜я┐╜реля┐╜я┐╜я┐╜   : Ctrl      Tab      +       Left Button ');
+  writeln('я┐╜я┐╜реля┐╜я┐╜я┐╜2  : Alt       CapsLock Num Lock            ');
+  writeln('я┐╜редя┐╜я┐╜ужия┐╜ : Shift     Q        *                   ');
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ужия┐╜ : Enter     ~        -       Right Button');
+  writeln('я┐╜я┐╜равя┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜тамя┐╜: Z-я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜  X-я┐╜я┐╜раня┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜  C-я┐╜я┐╜я┐╜ьно V - смирно!');
+  writeln('F2 - я┐╜я┐╜раня┐╜я┐╜я┐╜  F3 - я┐╜я┐╜я┐╜я┐╜узия┐╜я┐╜');
 end;
 procedure keyb; {interrupt;}
-var i,j:integer;
 begin
-  dosmemget(s,o,pkey,sizeof(pkey));
-//  pkey[port[$60] mod $80]:=port[$60]<$80;
-//  asm db $60 end;
-//  vec;
+  PollEvents;
 end;
 
 procedure loadmonsters(a:string);
@@ -323,6 +314,7 @@ begin
   with monster[i] do
    if name<>'' then
    begin
+     writeln('Loading monster ',i,': ',name,' vis=',vis);
      stand[left]:=loadbmp(vis+'s');
      stand[right]:=loadbmpr(vis+'s');
 
@@ -648,33 +640,8 @@ if ioresult<>0 then exit;
   close(f);
 end;
 procedure loadkeys;
-var
-  f:text;
-  s2,o2: longint;
-  sign:string;
 begin
-   write('Loading AGENT.MEM...');
-  {Keyboard Agent  (agent.exe)}
-{$i-}  assign(f,'agent.mem');
-  reset(f);
-  readln(f,s); readln(f,o);
-  readln(f,s2); readln(f,o2);
-  close(f);
-{$i+}
-  dosmemget(s2,o2,sign,256);
-  if (ioresult<>0)or(sign<>'Agent.exe is runing now') then begin
-   write(#13#10'Loading AGENT.EXE...');
-   swapvectors;
-   exec('agent.exe','');
-   swapvectors;
-   if doserror<>0 then begin
-     writeln('Error while loading AGENT.EXE');
-     halt;
-   end;
-   writeln('Done');
-   loadkeys;
-  end;
- writeln('Done');
+  writeln('SDL2 keyboard input initialized');
 end;
 //  new(p); fillchar(p^,sizeof(p^),0);
 //  new(tempbmp); new(tempdata); new(cbmp);

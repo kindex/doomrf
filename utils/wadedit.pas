@@ -2,20 +2,20 @@ uses wads,api;
 var w:twad;
 procedure about;
 begin
-  writeln('Syntax: WADEDIT.EXE <Операция> FILE.WAD MASK [EXT]');
-  writeln('MASK - Маска файла (PlayPal  *  *.*  Pl)');
-  writeln('Ext  - Расширение (.bmp .pix)');
-  writeln('Операции');
-  writeln('A (Add)    - Добавить файлы Mask');
-  writeln('E (Extract)- Извлечь файлы Mask1 с асширеием Ext');
-  writeln('R (Remove) - Удалить файлы Mask');
-  writeln('D (Dir)    - Показать все файлы');
-  writeln('F (Find)   - Показать файлы Mask');
+  writeln('Syntax: WADEDIT.EXE <я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜> FILE.WAD MASK [EXT]');
+  writeln('MASK - я┐╜я┐╜ска файя┐╜я┐╜ (PlayPal  *  *.*  Pl)');
+  writeln('Ext  - я┐╜я┐╜я┐╜я┐╜реня┐╜я┐╜ (.bmp .pix)');
+  writeln('я┐╜я┐╜я┐╜я┐╜ции');
+  writeln('A (Add)    - я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ Mask');
+  writeln('E (Extract)- я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ Mask1 я┐╜ я┐╜я┐╜я┐╜реия┐╜я┐╜ Ext');
+  writeln('R (Remove) - я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ Mask');
+  writeln('D (Dir)    - я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜ файя┐╜я┐╜');
+  writeln('F (Find)   - я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ Mask');
   halt;
 end;
 var op:string;
 begin
-  writeln('WAD Editor v0.1 Ivanov Andrey <-[■]-> IVA vision [24.12.2k]');
+  writeln('WAD Editor v0.1 Ivanov Andrey <-[я┐╜]-> IVA vision [24.12.2k]');
   writeln;
   if paramcount<3 then about;
   w.load(paramstr(2));
@@ -28,8 +28,8 @@ begin
    'F':  w.find(paramstr(3));
   end;
 {  w.create('12345.wad');}
-{  w.add('*.tmp');
-  w.dir;
+{  w.add('*.tmp');}
+{  w.dir;}
 {  w.delete('wad');}
 {  w.dir;}
 {  w.extract('*','.pix');}

@@ -2,7 +2,7 @@
 unit wads;
 
 interface
-uses api,dos,crt;
+uses api,sysutils;
 const
   maxwad=16;
 type
@@ -64,7 +64,7 @@ var
 
 
 implementation
-uses ports,sprites,fpgraph;
+uses sprites,sdlgraph;
 
 var curpos:longint;
 
@@ -84,7 +84,7 @@ var
   b: tbmp;
 begin
   fillchar(b,sizeof(b),0);
-  write('Извлекаю ',mask:12,' в ',mask+g:12);
+  write('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ ',mask:12,' я┐╜ ',mask+g:12);
   if (upcase(mask)<>'PLAYPAL')
   and
   (b.loadwad(mask)) then begin
@@ -96,7 +96,7 @@ begin
   new(p);
   if pos('.',mask)=0 then system.assign(res,mask{+g}) else system.assign(res,mask);
 {$i-}  rewrite(res,1); {$i+}
-  if ioresult<>0 then begin writeln(' ****** Ошибка создания файла !!!'); dispose(p);exit;end;
+  if ioresult<>0 then begin writeln(' ****** я┐╜шибя┐╜я┐╜ созя┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ !!!'); dispose(p);exit;end;
   system.seek(f,cur.n);
   system.blockread(f,p^,cur.l);
   system.blockwrite(res,p^,cur.l);
@@ -106,17 +106,18 @@ begin
   writeln('Ok':5)
 end;
 procedure twad.add(mask:string);
-var ss:searchrec;
+var ss:TSearchRec;
 begin
   if not loaded then create(name);
-  dos.findfirst(mask,anyfile,ss);
-  while doserror=0 do
+  if sysutils.FindFirst(mask,faAnyFile,ss)=0 then
   begin
-    if pos('.bmp',downcase(ss.name))>0 then
-     addasbmp(ss.name)
-     else
-    addfile(ss.name);
-    dos.findnext(ss);
+    repeat
+      if pos('.bmp',downcase(ss.name))>0 then
+       addasbmp(ss.name)
+       else
+      addfile(ss.name);
+    until sysutils.FindNext(ss)<>0;
+    sysutils.FindClose(ss);
   end;
 end;
 procedure twad.writecapt;
@@ -129,15 +130,15 @@ var
   k,i,sm,sos:longint;
   p: pointer;
 begin
-  write('Удаляю ',ss:10);
+  write('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ ',ss:10);
   k:=getel(ss);
-  if error<>0 then begin writeln(' ******* Не могу найти ',ss);exit; end;
+  if error<>0 then begin writeln(' ******* я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ ',ss);exit; end;
 
 
   sm:=filesize(f);
   getmem(p,sm);
   sos:=sm-table^[k+1].n-n*16;
-  write(' (двигаю ',sos,' байтов) ');
+  write(' (я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ ',sos,' я┐╜я┐╜я┐╜тов) ');
   seek(f,table^[k+1].n); blockread (f,p^,sos);
   seek(f,table^[k].n);   blockwrite(f,p^,sos);
 
@@ -169,7 +170,7 @@ var
 begin
   system.assign(res,ss);
 {$i-}  system.reset(res,1); {$i+}
-  if ioresult<>0 then begin error:=1; writeln(' ******* Не могу найти ',ss,'!!!'); exit;end;
+  if ioresult<>0 then begin error:=1; writeln(' ******* я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ ',ss,'!!!'); exit;end;
   if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
   k.l:=filesize(res);
   k.n:=tab;
@@ -179,7 +180,7 @@ begin
     delete(ss);
   end;
 
-  write('Добавляю ',ss:10,' в ',name,': ');
+  write('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ ',ss:10,' я┐╜ ',name,': ');
   k.name:=#0#0#0#0#0#0#0#0;
   for i:=1 to length(ss) do k.name[i]:=ss[i];
   inc(n);
@@ -213,7 +214,7 @@ begin
   fillchar(p,sizeof(p),0);
   p.loadfile(ss);
   if p.x=0 then
-     begin error:=1; writeln(' ******* Не могу загрузить ',ss,'!!!'); exit;end;
+     begin error:=1; writeln(' ******* я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜узия┐╜я┐╜ ',ss,'!!!'); exit;end;
 
   if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
 
@@ -225,7 +226,7 @@ begin
     delete(ss);
   end;
 
-  write('Добавляю ',ss:10,' в ',name,': ');
+  write('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ ',ss:10,' я┐╜ ',name,': ');
   k.name:=#0#0#0#0#0#0#0#0; for i:=1 to length(ss) do k.name[i]:=ss[i];
   inc(n);
   table^[n]:=k;
@@ -395,13 +396,13 @@ begin
 {$i-}  system.reset(f,1);{$i+}
  if ioresult<>0 then
    begin
-     writeln('Не могу айти файл ',name);
+     writeln('я┐╜я┐╜ я┐╜я┐╜я┐╜я┐╜ я┐╜я┐╜я┐╜ файя┐╜ ',name);
 {     create(name);}
      loaded:=false;
      exit;
    end;
   system.blockread(f,capt,4);
-  if (c<>capt)and(c2<>capt) then begin system.close(f); writeln(name,'-Это не IWAD (PWAD) файл');halt;end;
+  if (c<>capt)and(c2<>capt) then begin system.close(f); writeln(name,'-я┐╜я┐╜ я┐╜я┐╜ IWAD (PWAD) файя┐╜');halt;end;
 
   system.blockread(f,n,4);
   system.blockread(f,tab,4);
@@ -417,24 +418,24 @@ end;
 procedure twad.dir;
 var i:longint;
 begin
-  writeln('Имя         Позиция       Размер');
+  writeln('я┐╜я┐╜я┐╜         я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜       я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜');
   for i:=1 to n do
    writeln(table^[i].name,table^[i].n:12,table^[i].l:12);
-  writeln('Размер файла ',name,': ',n*16+tab);
-  writeln('Элементов: ',n);
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ ',name,': ',n*16+tab);
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜тов: ',n);
 end;
 procedure twad.find;
 var i:longint;
 begin
-  writeln('Имя         Позиция       Размер');
+  writeln('я┐╜я┐╜я┐╜         я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜       я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜');
   findfirst(ss);
   while error=0 do
   begin
     writeln(cur.name,cur.n:12,cur.l:12);
     findnext;
   end;
-  writeln('Размер файла ',name,': ',n*16+tab);
-  writeln('Элементов: ',n);
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ файя┐╜я┐╜ ',name,': ',n*16+tab);
+  writeln('я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜тов: ',n);
 end;
 
 procedure taw.assign(ss:string);
@@ -472,12 +473,14 @@ end;
 
 procedure taw.addall(s:string);
 var
-  f:searchrec;
+  f:TSearchRec;
 begin
-  findfirst(s+'\*.wad',anyfile,f);
-  while doserror=0 do begin
-    addwad(s+'\'+f.name);
-    findnext(f);
+  if sysutils.FindFirst(s+PathDelim+'*.wad',faAnyFile,f)=0 then
+  begin
+    repeat
+      addwad(s+PathDelim+f.name);
+    until sysutils.FindNext(f)<>0;
+    sysutils.FindClose(f);
   end;
 end;
 
