@@ -104,7 +104,7 @@ function loadbmpr(a:string):tnpat;
 
 
 implementation
-uses api,wads,rfunit;
+uses api,wads,rfunit,sdl2,sdl2_image;
 
 procedure out(a:char);
 begin
@@ -281,10 +281,20 @@ begin
   if x=0 then error:=1 else error:=0;
 end;
 
+procedure loadpng(var self: tbmp; a: string); forward;
+
 procedure tbmp.loadfile(a:string);
 var
   f:file;
+  ext: string;
 begin
+  // Check extension for PNG
+  ext := lowercase(copy(a, length(a)-3, 4));
+  if ext = '.png' then begin
+    loadpng(self, a);
+    exit;
+  end;
+
   done;
   assign(f,a{+dotbmp});
 {$i-}  reset(f,1);{$i+}
@@ -293,7 +303,7 @@ begin
     exit;
   end;
   blockread(f,fmt,fmtsize);
-  if fmt.sign<>bmpsign then begin error:=1; exit; end;
+  if fmt.sign<>bmpsign then begin close(f); error:=1; exit; end;
   x:=fmt.x;
   y:=fmt.y;
   initdata(x,y);
@@ -301,7 +311,7 @@ begin
    8: load8(f);
    16: load16(f);
    24: load24(f);
-   else begin donedata; error:=1; exit; end;
+   else begin donedata; error:=1; close(f); exit; end;
   end;
   close(f);
   error:=0;
@@ -368,6 +378,57 @@ begin
   end;
   tag:=ibmp;
 end;
+
+procedure loadpng(var self: tbmp; a: string);
+var
+  surf: PSDL_Surface;
+  i, j: longint;
+  pixels: PByte;
+  r, g, b, alpha: byte;
+  bpp, pitch: longint;
+  pixel: longword;
+  cstr: array[0..255] of char;
+begin
+  // Ensure palette is loaded before color conversion
+  if not palLoaded then
+    loadpal('RF/playpal.bmp');
+
+  self.done;
+  fillchar(cstr, sizeof(cstr), 0);
+  move(a[1], cstr, length(a));
+  surf := IMG_Load(@cstr[0]);
+  if surf = nil then begin
+    error := 1;
+    exit;
+  end;
+
+  self.x := surf^.w;
+  self.y := surf^.h;
+  self.initdata8(self.x, self.y);
+
+  pixels := PByte(surf^.pixels);
+  bpp := surf^.format^.BytesPerPixel;
+  pitch := surf^.pitch;
+
+  for j := 0 to self.y - 1 do
+    for i := 0 to self.x - 1 do begin
+      pixel := 0;
+      Move(pixels[j * pitch + i * bpp], pixel, bpp);
+      SDL_GetRGBA(pixel, surf^.format, @r, @g, @b, @alpha);
+
+      // Transparent pixels -> palette index 0
+      if alpha < 128 then
+        self.bmp^[j * self.x + i] := 0
+      else
+        self.bmp^[j * self.x + i] := getcolor(r, g, b);
+    end;
+
+  SDL_FreeSurface(surf);
+  self.tag := ibmp;
+  error := 0;
+  self.setname(a);
+end;
+
 procedure tbmp.initdata(ax,ay:longint);
 begin
   x:=ax; y:=ay;

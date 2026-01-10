@@ -53,12 +53,16 @@ cp README.txt CHANGELOG.txt "$DIST_DIR/" 2>/dev/null || true
 # Платформо-зависимые файлы
 case "$PLATFORM" in
   linux64)
-    # SDL2 библиотека для Linux
-    if [ -f libSDL2.so ]; then
-        cp libSDL2.so "$DIST_DIR/"
-    elif [ -f /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 ]; then
-        cp /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 "$DIST_DIR/libSDL2.so"
+    # Библиотеки из libs/
+    mkdir -p "$DIST_DIR/libs"
+    cp libs/*.so* "$DIST_DIR/libs/" 2>/dev/null || true
+    # SDL2 из системы если нет локальной
+    if [ ! -f "$DIST_DIR/libs/libSDL2"* ]; then
+        [ -f /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 ] && \
+            cp /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 "$DIST_DIR/libs/"
     fi
+    # Скрипт запуска
+    cp run.sh "$DIST_DIR/"
     ;;
   win64|win32)
     # SDL2.dll для Windows (должен лежать в проекте)
@@ -66,6 +70,12 @@ case "$PLATFORM" in
         cp SDL2.dll "$DIST_DIR/"
     else
         echo "WARNING: SDL2.dll not found. Download from https://libsdl.org/download-2.0.php"
+    fi
+    # SDL2_image.dll для PNG
+    if [ -f SDL2_image.dll ]; then
+        cp SDL2_image.dll "$DIST_DIR/"
+    else
+        echo "WARNING: SDL2_image.dll not found"
     fi
     # Добавить build.bat
     cp build.bat "$DIST_DIR/"

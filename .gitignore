@@ -15,3 +15,7 @@
 */RF/BMP/
 */RF/*.bmp
 */RF/*.wav
+/Doom/Saves/*.sav
+libs/libSDL2_image.so
+libs/libSDL2-2.0.so.0
+libs/libSDL2.so
