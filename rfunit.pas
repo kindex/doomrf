@@ -70,7 +70,7 @@ type
 var
   maxs: integer;
   sdir: array[1..maxsdir]of string;
-  pkey:array[byte]of boolean {absolute _key_pressed};
+  // pkey теперь в sdlinput
   must:array[0..maxmust]of record
     tip: integer;
     x,y,curtip: integer;
