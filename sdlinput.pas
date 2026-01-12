@@ -318,16 +318,22 @@ end;
 
 function push: boolean;
 begin
+  SDL_PumpEvents;
+  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
   push := (mouseButtonState and SDL_BUTTON_LMASK) <> 0;
 end;
 
 function push2: boolean;
 begin
+  SDL_PumpEvents;
+  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
   push2 := (mouseButtonState and SDL_BUTTON_RMASK) <> 0;
 end;
 
 function push3: boolean;
 begin
+  SDL_PumpEvents;
+  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
   push3 := (mouseButtonState and SDL_BUTTON_MMASK) <> 0;
 end;
 
