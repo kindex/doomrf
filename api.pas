@@ -18,6 +18,7 @@ function  maxext(a,b:extended):extended;
 function  fexist(name:string):boolean;
 function  getfilename(name:string):string;
 function  norm(a,b,c:longint):longint;
+function  UTF8ToCP866(const s: string): string;
 
 implementation
 function norm(a,b,c:longint):longint;
@@ -97,6 +98,63 @@ begin
   for i:=1 to length(c) do
   if (c[i]>#64)and(c[i]<#90)then
   downcase[i]:=chr(ord(c[i])+32);
+end;
+
+{ Convert UTF-8 string to CP866 for font rendering }
+function UTF8ToCP866(const s: string): string;
+var
+  i, len: integer;
+  b1, b2: byte;
+  cp: word;
+begin
+  Result := '';
+  i := 1;
+  len := Length(s);
+  while i <= len do
+  begin
+    b1 := Ord(s[i]);
+    if b1 < 128 then
+    begin
+      { ASCII - copy as is }
+      Result := Result + s[i];
+      Inc(i);
+    end
+    else if (b1 and $E0) = $C0 then
+    begin
+      { 2-byte UTF-8 sequence }
+      if i + 1 <= len then
+      begin
+        b2 := Ord(s[i + 1]);
+        cp := ((b1 and $1F) shl 6) or (b2 and $3F);
+        { Convert Unicode to CP866 }
+        case cp of
+          $0410..$041F: Result := Result + Chr(cp - $0410 + $80);  { А-П -> 128-143 }
+          $0420..$042F: Result := Result + Chr(cp - $0420 + $90);  { Р-Я -> 144-159 }
+          $0430..$043F: Result := Result + Chr(cp - $0430 + $A0);  { а-п -> 160-175 }
+          $0440..$044F: Result := Result + Chr(cp - $0440 + $E0);  { р-я -> 224-239 }
+          $0401: Result := Result + Chr($F0);  { Ё -> 240 }
+          $0451: Result := Result + Chr($F1);  { ё -> 241 }
+        else
+          Result := Result + '?';  { Unknown char }
+        end;
+        Inc(i, 2);
+      end
+      else
+        Inc(i);
+    end
+    else if (b1 and $F0) = $E0 then
+    begin
+      { 3-byte UTF-8 - skip }
+      Inc(i, 3);
+    end
+    else if (b1 and $F8) = $F0 then
+    begin
+      { 4-byte UTF-8 - skip }
+      Inc(i, 4);
+    end
+    else
+      Inc(i);
+  end;
 end;
 
 end.

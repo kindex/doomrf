@@ -26,14 +26,14 @@ const
    );}
   load:array[1..8]of string[40]=
   (
-  #13#10'���� (bot.ini) ...',
-  #13#10'�⥭� (wall.dat)'  ,
-  #13#10'����� (bomb.ini)' ,
-  #13#10'�㫨 (bullet.ini)' ,
-  #13#10'��㦨� (weapon.ini)',
-  #13#10'�।���� (item.ini)',
-  #13#10'������� (monster.ini)',
-#13#10'��⠫쭮� (func.ini, bitmaps)'
+  #13#10'Боты (bot.ini) ...',
+  #13#10'Стены (wall.ini)',
+  #13#10'Взрывы (bomb.ini)',
+  #13#10'Пули (bullet.ini)',
+  #13#10'Оружие (weapon.ini)',
+  #13#10'Предметы (item.ini)',
+  #13#10'Монстры (monster.ini)',
+  #13#10'Остальное (func.ini, bitmaps)'
   );
 type
   tcaption=array[1..4]of char;
@@ -92,7 +92,7 @@ type
     procedure done;
   end;}
 //  tpat=tspr;
-//  arrayoftpat=array[tnpat]of tpat; {⥪�����}
+//  arrayoftpat=array[tnpat]of tpat; {текстуры}
 //  tscreen=array[0..1200]of ^tarray;
   tfont=object
      vis: string[8];
@@ -950,7 +950,7 @@ procedure tfont.print(ax,ay:integer; s:string);
 var
   i,mx:integer;
 begin
-  s:=upcase(s);
+  s:=UTF8ToCP866(upcase(s));
 
   mx:=0;
   for i:=1 to length(s) do
@@ -964,7 +964,7 @@ function tfont.width(s:string):integer;
 var
   i,mx:integer;
 begin
-  s:=upcase(s);
+  s:=UTF8ToCP866(upcase(s));
 
   mx:=0;
   for i:=1 to length(s) do
