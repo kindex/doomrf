@@ -695,7 +695,10 @@ begin
 end;
 function menu(max,def:integer; title: string):integer;
 var
-  ch,hod,enter,i,maxl:integer;
+  ch,hod,enter,i,maxl,mouseItem:integer;
+  wasMousePressed,mousePressed:boolean;
+  mouseY,lastMouseY:integer;
+  keyboardMode:boolean;
 const
   x1:integer=80;
   y1:integer=50;
@@ -743,6 +746,9 @@ begin
   if max=0 then begin menu:=0; exit; end;
 
   ch:=def;  hod:=0; enter:=0;
+  wasMousePressed:=sdlinput.push;
+  lastMouseY:=Y;
+  keyboardMode:=false;
   if (ch<1)or(ch>max)then ch:=1;
   repeat
     inc(hod);
@@ -750,6 +756,22 @@ begin
     if y1<30 then y1:=30;
     if (y1+(ch-1)*d>getmaxy-30)then y1:=-(ch-1)*d+getmaxy-30;
     draw;
+    { Mouse handling }
+    PollEvents;
+    mousePressed := sdlinput.push;
+    mouseY := Y;
+    { If mouse moved - disable keyboard mode }
+    if mouseY <> lastMouseY then keyboardMode := false;
+    lastMouseY := mouseY;
+    { Mouse affects selection only if NOT in keyboard mode }
+    if (not keyboardMode) and (mouseY >= y1) and (mouseY < y1 + max*d) then
+    begin
+      mouseItem := (mouseY - y1) div d + 1;
+      ch := mouseItem;
+      if mousePressed and not wasMousePressed then
+        enter := mouseItem;
+    end;
+    wasMousePressed := mousePressed;
     if quit_requested then break;
     if keypressed then
     case readkey of
@@ -757,10 +779,12 @@ begin
       #27: break;
       #9:  ch:=(ch)mod max+1;
       #0:case readkey of
-        #80: if ch<max then inc(ch);
-        #72: if ch>1 then dec(ch);
-        #73: {PgUp} ch:=1;
-        #81: {PgDn} ch:=max;
+        #80: begin if ch<max then inc(ch); keyboardMode:=true; end; {Down}
+        #72: begin if ch>1 then dec(ch); keyboardMode:=true; end;   {Up}
+        #73: begin ch:=1; keyboardMode:=true; end;   {PgUp}
+        #81: begin ch:=max; keyboardMode:=true; end; {PgDn}
+        #71: begin ch:=1; keyboardMode:=true; end;   {Home}
+        #79: begin ch:=max; keyboardMode:=true; end; {End}
        end;
     end;
   until (enter>0) or quit_requested;
@@ -5482,6 +5506,7 @@ begin
     pkey[i]:=false;
 
   level.endgame:=false;
+  sdlinput.show;
   mm:=4; if level.death then mm:=5;
   men[1]:='Continue';
   men[2]:='Save';
@@ -5495,6 +5520,7 @@ begin
    4: level.endgame:=true;
    5: player[1].win:=true;
   end;
+  if not level.endgame then sdlinput.hide;
   unpush:=false;
 end;
 
@@ -6135,6 +6161,7 @@ begin
 //  initgraph(res);
   mx:=640; my:=480;
   setmode(mx,my); setpal;
+  Sensetivity(sdlgraph.WINDOW_SCALE, sdlgraph.WINDOW_SCALE);
   loadfont(maininidir,8);
   getmaxx:=mx; getmaxy:=my;
   minx:=0; miny:=0; maxx:=getmaxx; maxy:=getmaxy;
@@ -6175,7 +6202,6 @@ begin
   winall:=false;
   ddx:=sdlgraph.WINDOW_SCALE;
   ddy:=sdlgraph.WINDOW_SCALE;
-  Sensetivity(1,1);
   if level.editor then sdlinput.show else sdlinput.hide;
   mousebox(0,0,getmaxx,getmaxy); loaded:=false;
   unpush:=false; scrmode:=normal; hod:=0;  level.start:=time.tik; speed:=1; si:=true;
@@ -6218,6 +6244,7 @@ begin
     checktimer;
     checkwingame;
   until level.endgame or winall or quit_requested;
+  sdlinput.show;
   winall:=false;
  until quit_requested;
   {End game}

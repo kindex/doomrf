@@ -237,6 +237,14 @@ begin
             keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
             keyBuffer[keyHead] := #81; keyHead := (keyHead + 1) mod 256;
           end;
+          SDLK_HOME: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #71; keyHead := (keyHead + 1) mod 256;
+          end;
+          SDLK_END: begin
+            keyBuffer[keyHead] := #0; keyHead := (keyHead + 1) mod 256;
+            keyBuffer[keyHead] := #79; keyHead := (keyHead + 1) mod 256;
+          end;
         else
           // Regular keys
           ch := SDLKeyToChar(event.key.keysym);
@@ -318,22 +326,20 @@ end;
 
 function push: boolean;
 begin
-  SDL_PumpEvents;
-  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
+  // Use stored state from PollEvents - don't pump again
+  WriteLn('>>>PUSH<<< state=', mouseButtonState, ' LMASK=', SDL_BUTTON_LMASK);
   push := (mouseButtonState and SDL_BUTTON_LMASK) <> 0;
 end;
 
 function push2: boolean;
 begin
-  SDL_PumpEvents;
-  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
+  // Use stored state from PollEvents - don't pump again
   push2 := (mouseButtonState and SDL_BUTTON_RMASK) <> 0;
 end;
 
 function push3: boolean;
 begin
-  SDL_PumpEvents;
-  mouseButtonState := SDL_GetMouseState(@mouseX, @mouseY);
+  // Use stored state from PollEvents - don't pump again
   push3 := (mouseButtonState and SDL_BUTTON_MMASK) <> 0;
 end;
 
@@ -367,8 +373,8 @@ end;
 
 procedure Sensetivity(sx, sy: word);
 begin
-  // SDL2 uses system mouse sensitivity
-  // This is a no-op in modern systems
+  ddx := sx;
+  ddy := sy;
 end;
 
 // Keyboard implementation
