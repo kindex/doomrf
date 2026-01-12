@@ -59,7 +59,7 @@ type
     procedure reverse;
   end;
   sprtable=array[0..maxdots]of word; // XYLCCCCXYLCCC...
-  { �� 2 ���� /    L    \
+  { по 2 байта /    L    \
     X1 Y1 L1 : CC CC CC CC
     X2 Y2 L2 : CC CC CC ...
   }
@@ -361,7 +361,7 @@ var
   t:array[0..1024*2*3{Or more- max x}] of byte;
 begin
   seek(f,fmt.fmtsize);
-  bpl:=fmt.imagesize div y-x*3; // ���⮪
+  bpl:=fmt.imagesize div y-x*3; // остаток
   for i:=y-1 downto 0 do begin
     blockread(f,t,x*3);
     if bpl<>0 then blockread(f,null,bpl);

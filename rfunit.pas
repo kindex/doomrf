@@ -8,7 +8,7 @@ const
   mainmod:string='RF';
   runmod:string='RF';
   tit:array[1..maxtit]of string=(
-  'Copyright DiVision ','>--=[�]=--<','^ ^',
+  'Copyright DiVision ','>--=[Ж]=--<','^ ^',
   'PRG',
   'Andrey Ivanov "KindeX[MMX]" kindexz@gmail.com',
   'Levels & Design',
@@ -249,17 +249,17 @@ end;
 
 procedure manualinfo;
 begin
-  writeln('��ࠢ����� : 1(Center) 2(Left)  3(PAD)  4(Mouse)    ');
-  writeln('��ࠢ�     : Right     D        PgDn    Left        ');
-  writeln('�����      : Left      A        End     Right       ');
-  writeln('��릮�     : Up        W        Pad 5   Up          ');
-  writeln('����       : Down      S        Ins     Down        ');
-  writeln('��५���   : Ctrl      Tab      +       Left Button ');
-  writeln('��५���2  : Alt       CapsLock Num Lock            ');
-  writeln('�।��㦨� : Shift     Q        *                   ');
-  writeln('������㦨� : Enter     ~        -       Right Button');
-  writeln('��ࠢ����� ��⠬�: Z-�� ����  X-��࠭��� ������  C-���쭮 V - ᬨ୮!');
-  writeln('F2 - ��࠭���  F3 - ����㧨��');
+  writeln('Управление : 1(Center) 2(Left)  3(PAD)  4(Mouse)    ');
+  writeln('Вправо     : Right     D        PgDn    Left        ');
+  writeln('Влево      : Left      A        End     Right       ');
+  writeln('Прыжок     : Up        W        Pad 5   Up          ');
+  writeln('Сесть      : Down      S        Ins     Down        ');
+  writeln('Стрельба   : Ctrl      Tab      +       Left Button ');
+  writeln('Стрельба2  : Alt       CapsLock Num Lock            ');
+  writeln('Предоружие : Shift     Q        *                   ');
+  writeln('Следоружие : Enter     ~        -       Right Button');
+  writeln('Управление ботами: Z-не ходи  X-охраняй позицию  C-дальше V - смирно!');
+  writeln('F2 - Сохранить  F3 - Загрузить');
 end;
 procedure keyb; {interrupt;}
 begin

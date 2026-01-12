@@ -36,7 +36,7 @@ const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   cwall = 1 shl 0;  cstand= 1 shl 1;  cwater= 1 shl 2;  clava = 1 shl 3; cshl= 1 shl 4; cshr= 1 shl 5;
      cFunc= 1 shl 6; cDeath=1 shl 7;
 
-  cOverDraw=cshl+cshr; // ������
+  cOverDraw=cshl+cshr; // Поверх
 
   cjump = 1 shl 0;
   cimp = 1 shl 1; cgoal = 1 shl 0;
@@ -65,15 +65,15 @@ const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
   edwallstr:array[1..8]of string[16]=
-  ('�⥭�',  '��㯥��',  '����',  '����',  '<< /Over',  '>> /Over',  'Function',  'Deathmatch');
+  ('Стена',  'Ступень',  'Вода',  'Лава',  '<< /Over',  '>> /Over',  'Function',  'Deathmatch');
 {  ednodestr:array[1..4]of string[16]=
-  ( '����-��室',  '�����',  '�।���',  '-'  );}
+  ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
   maxedmenu=12+5+4+1+2+1;
   edmenustr:array[1..maxedmenu]of string[16]=
-  ('��室',  '���࠭���',  '����㧨��',  '�����',  '��������',  '�⥭�',
-   '�������',  '�।����',  '�㭪樨',  '������',  '���',  '(C)',
-   '��㦨�','���஭�','���窨','������','�������',
-   '','����','�⥭�','��㯥��','����','��������+','�⥭�+','����饭��');
+  ('Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
+   'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)',
+   'Оружие','Патроны','Аптечки','Интерьер','Колонны',
+   '','Пусто','Стена','Ступень','Обои','Текстуры+','Стены+','Сообщения');
 type
   real=single;
   tcapt=array[1..4]of char;
@@ -542,11 +542,11 @@ begin
 //  writeln(comment);
 //  writeln;
 {  textattr:=4+8;
-  writeln('����᪩� ⮫쪮 RF.BAT !!! (���� � ��� �� �㤥� ࠡ���� ���������)');
+  writeln('Запускайте только RF.BAT !!! (иначе у вас не будет работать клавиатура)');
   textattr:=7;}
 //  textattr:=14;
-//  writeln('*** �᫨ � ��� �஡���� � ��䨪�� - '
-//   #13#10'������� �᫮ � ��ࢮ� ���窥 � 䠩�� res.ini �� 0');
+//  writeln('*** Если у вас проблемы с графикой - '
+//   #13#10'замените число в первой строчке в файле res.ini на 0');
 //  textattr:=7;
 //  writeln(':)');
 end;
@@ -771,14 +771,14 @@ procedure weaponinfo;
 var i:integer;
 begin
 //  writeln;
-//  writeln('�஭ �� ��㦨� � ᥪ㭤�.');
+//  writeln('Урон от оружия в секунду.');
   for i:=0 to maxweapon do
    with weapon[i] do
    if name<>'' then
    begin
      write(name:16,' - ',damages:6:2);
-     if bomb>0 then write(' / ���� - ',bomb:6:2);
-     if hits>0 then write(' / �������� - ',hits:6:2);
+     if bomb>0 then write(' / Взрыв - ',bomb:6:2);
+     if hits>0 then write(' / Ближнее - ',hits:6:2);
      writeln;
    end;
  end;
@@ -940,23 +940,23 @@ function strtime(a:longint): string;
 var
  r:string;
 begin
-  r:=st(a mod 60)+' ᥪ';
+  r:=st(a mod 60)+' сек';
   a:=a div 60;
   if a>0 then
-    r:=st(a mod 60)+' ��� '+ r;
+    r:=st(a mod 60)+' мин '+ r;
   a:=a div 60;
   if a>0 then
-    r:=st(a)+' �� '+ r;
+    r:=st(a)+' час '+ r;
 
   strtime:=r;
 end;
 
 procedure drawwin;
 const
-  kills='�����⢠ - ';
-  items='�।���� - ';
-  times='�६� - ';
-  alltimes='�ᥣ� - ';
+  kills='Убийства - ';
+  items='Предметы - ';
+  times='Время - ';
+  alltimes='Всего - ';
 var
   c,i,j: integer;
   a,b: string;
@@ -965,7 +965,7 @@ begin
   if level.training then exit;
   level.alltime:=level.alltime+level.curtime-level.start;
   a:=winbmp;
-  b:='������ ����� ��ࠧ������� ������';
+  b:='Теперь можно отпраздновать победу';
   del:=6;
   clear;
   box(0,0,getmaxx,getmaxy);
@@ -1000,12 +1000,12 @@ end;
 procedure drawlose;
 begin
   if level.training then exit;
-  putlogo(losebmp,'� ��� �஡���� � ���஢쥬',3);
+  putlogo(losebmp,'У вас проблемы со здоровьем',3);
 end;
 procedure drawintro;
 begin
   if level.training then exit;
-  putlogo(startbmp,'� �� �६�...',3);
+  putlogo(startbmp,'И вот время...',3);
   time.move;
 //  level.start:=time.cur;
 end;
@@ -1446,7 +1446,7 @@ begin
     god.init(n);
     takegod:=true;
     if not level.multi then
-      info.add('�� ��﫨 ���ᬥ�⨥ !',red,5);
+      info.add('Вы взяли бессмертие !',red,5);
   end
    else
     takegod:=false;
@@ -1459,7 +1459,7 @@ begin
     takearmor:=true;
     if armor>playmaxarmor then armor:=playmaxarmor;
     if (not level.multi)and (hero>0) then
-      info.add('�� ��﫨 '+st(round(n))+' �஭�',yellow,5);
+      info.add('Вы взяли '+st(round(n))+' брони',yellow,5);
   end
   else
     takearmor:=false;
@@ -1478,7 +1478,7 @@ begin
   if health>=getmaxhealth then begin takehealth:=false; exit; end;
 
   if not level.multi and (hero>0) then
-    info.add('�� ��﫨 '+st(round(n))+' ���஢��',green,5);
+    info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
 
   health:=health+n;
   fired.clear;
@@ -1491,7 +1491,7 @@ begin
   health:=health+n;
 
   if not level.multi and (hero>0) then
-    info.add('�� ��﫨 '+st(round(n))+' ���஢��',green,5);
+    info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
 
   fired.clear;
   if health>getmaxhealth*2 then health:=getmaxhealth*2;
@@ -1662,9 +1662,9 @@ begin
     if not map.m^[hero].qdamage.ready then
       rb.print(minx+300,maxy-40,'QDamage: '+st(round(map.m^[hero].qdamage.getest)));
     if map.m^[hero].aqua then
-      rb.print(minx+300,maxy-30,'��������');
+      rb.print(minx+300,maxy-30,'Прыжки');
     if map.m^[hero].longjumpn>0 then
-      rb.print(minx+300,maxy-20,'��릪��: '+st(map.m^[hero].longjumpn));
+      rb.print(minx+300,maxy-20,'Прыжков: '+st(map.m^[hero].longjumpn));
 
     if not map.m^[hero].armorhit.ready then
       rb.print(minx+210,maxy-40,'Armor: '+st(round(map.m^[hero].armorhit.getest)));
@@ -1698,7 +1698,7 @@ begin
     if map.m^[hero].qdamage.en then
       rb.print(maxx-60,miny+110,'QDam '+st(round(map.m^[hero].qdamage.getest)));
     if map.m^[hero].aqua then
-      rb.print(maxx-60,miny+120,'��������');
+      rb.print(maxx-60,miny+120,'Прыжки');
     if map.m^[hero].longjumpn>0 then
       rb.print(maxx-60,miny+130,'Jump '+st(map.m^[hero].longjumpn));
 
@@ -2639,16 +2639,16 @@ end;
 function gett(a:integer): string;
 begin
   if player[a].bot=0 then
-    gett:='��ப '+st(a)
+    gett:='Игрок '+st(a)
   else
-    gett:='��� '+st(a)
+    gett:='Бот '+st(a)
 end;
 function gett2(a:integer): string;
 begin
   if player[a].bot=0 then
-    gett2:='��ப� '+st(a)
+    gett2:='Игрока '+st(a)
   else
-    gett2:='��� '+st(a)
+    gett2:='Бота '+st(a)
 end;
 procedure tmon.dier;
 begin
@@ -2661,24 +2661,24 @@ if not barrel then
 begin
   if not level.multi then
   if hero>0 then
-    info.add('�� 㡨�� !!!',red,100)
+    info.add('Вы убиты !!!',red,100)
   else begin
     if (dwho<>who)and(map.m^[dwho].hero>0) then
-      info.add(monster[tip].name+' 㡨�',red,5) else
+      info.add(monster[tip].name+' убит',red,5) else
     if (dwho=who)then
-      info.add(monster[tip].name+' ᮢ��訫 ᠬ�㡨��⢮',red,5)
+      info.add(monster[tip].name+' совершил самоубийство',red,5)
     else
-      info.add(monster[tip].name+' 㡨� ᢮���',red,5);
+      info.add(monster[tip].name+' убит своими',red,5);
   end;
  if level.multi then begin
   if (not level.death)and(hero>0)and(player[hero].bot>0)and (map.m^[dwho].hero>0)and(who<>dwho) then begin
-    info.add(gett(hero)+': �� ��५� � ����, '+gett(map.m^[dwho].hero)+', - � �� ⢮�� ������� !!!',white, 10);
+    info.add(gett(hero)+': Не стреляй в меня, '+gett(map.m^[dwho].hero)+', - я не твой противник !!!',white, 10);
   end;
   if (level.death)and(hero>0){and(player[hero].bot>0)}and(dwho>=0)and(map.m^[dwho].hero>0) then begin
     if who<>dwho then
-      info.add(gett(map.m^[dwho].hero)+' 㡨� '+gett2(hero),botcol[map.m^[dwho].hero], 5)
+      info.add(gett(map.m^[dwho].hero)+' убил '+gett2(hero),botcol[map.m^[dwho].hero], 5)
     else
-      info.add(gett(map.m^[dwho].hero)+' ᮢ��訫 ᠬ�㡨��⢮',botcol[map.m^[dwho].hero], 5);
+      info.add(gett(map.m^[dwho].hero)+' совершил самоубийство',botcol[map.m^[dwho].hero], 5);
   end;
  end;
   if (map.m^[who].hero=0)and(dwho>=0)and(map.m^[dwho].hero>0) then
@@ -3513,17 +3513,17 @@ begin
      if downcase(s)='yes'then }level.endgame:=true;
    end;
    2: begin
-        wb.print(100,50,'�������');
+        wb.print(100,50,'Сохранить');
         s:=enterfile(map.name);
         if s<>'' then begin map.name:=s; map.save; end;
       end;
    3: begin
-        wb.print(100,50,'����㧨��');
-        s:=getlevel{enterfile(map.name)}('����㧨��');
+        wb.print(100,50,'Загрузить');
+        s:=getlevel{enterfile(map.name)}('Загрузить');
         if s<>'' then map.load(s);
       end;
     4: begin
-         wb.print(100,50,'����� ����');
+         wb.print(100,50,'Новая игра');
          s:='yes';
          readline(100,100,s,s,white,0);
          if downcase(s)='yes'then
@@ -3531,8 +3531,8 @@ begin
            map.done;
            map.create(defx,defx,0,0,defname);
            map.clear;
-           wb.print(100,110,'����᪨� �ࠢ�');
-           s:='������: ';
+           wb.print(100,110,'Авторские права');
+           s:='Автор: ';
            readline(1,160,map.copy,s,white,0);
            map.initnode(32,32,nodes.mask);
          end;
@@ -3545,7 +3545,7 @@ begin
     10: begin cool:=not cool; repeat until not sdlinput.push; end;
     11: begin scry:=getmaxy; what:=node; end;
     12:begin
-         wb.print(100,50,'�������ਨ');
+         wb.print(100,50,'Комментарии');
 {         readline(1,100,map.copy,map.copy,white,0);}
          readline(1,100,map.com,map.com,white,0);
        end;
@@ -3558,7 +3558,7 @@ begin
     20: land.mask:=cwall;
     21: land.mask:=cstand;
     22: {Wallpapers} begin
-        wb.print(100,50,'����');
+        wb.print(100,50,'Обои');
         map.wallpaper:=enterwall(map.wallpaper);
     end;
     23: begin scry:=getmaxy-50; what:=fillface;  reload; end;
@@ -3575,7 +3575,7 @@ begin
     if fun.editing then fun.editing:=false;
   end;
 
-  if mo(0,scry,getmaxx,getmaxy)then // ������ �ࠢ����� ᭨��
+  if mo(0,scry,getmaxx,getmaxy)then // Кнопки управления снизу
   if (not drag)and(not drag2) then
   begin
    if push then
@@ -4772,9 +4772,9 @@ begin
   level.add(name);
   assign(ff,levdir+name+levext);
   getfattr(ff,attr);
-  if (attr and readonly>0)and(doserror=0) then begin error('����� �������� �⠭����� �஢��!'); exit; end;
+  if (attr and readonly>0)and(doserror=0) then begin error('Нельзя изменять стандартные уровни!'); exit; end;
 {$i-}  rewrite(ff,1); {$i+}
-  if ioresult<>0 then begin error('�� ���� ��࠭��� '+levdir+name+levext); exit; end;
+  if ioresult<>0 then begin error('Не могу сохранить '+levdir+name+levext); exit; end;
   blockwrite(ff,origlev,sizeof(origlev));
   blockwrite(ff,x,4);
   blockwrite(ff,y,4);
@@ -5243,7 +5243,7 @@ begin
     close(f);
     findnext(g);
   end;
-  s:=menu(s,1,'��ப�');
+  s:=menu(s,1,'Игроки');
   if s<>0 then
    loadbots(c[s]);
 end;}
@@ -5512,8 +5512,8 @@ begin
   men[2]:='Main menu';
   case menu(2,1,'') of
    0,1: level.endgame:=false;
-//   2: savegame(getsave('��࠭���'));
-//   3: loadgame(getsave('����㧨��'));
+//   2: savegame(getsave('Сохранить'));
+//   3: loadgame(getsave('Загрузить'));
    2: level.endgame:=true;
   end;
   unpush:=false;
@@ -5535,13 +5535,13 @@ begin
  loaded:=false;
  repeat
    level.first:=false;
-   men[1]:='New game';
-   men[2]:='Training';
-   men[3]:='Network';
-   men[4]:='Deathmatch';
-   men[5]:='Load';
-   men[6]:='Editor';
-   men[7]:='Exit';
+   men[1]:='Один игрок';
+   men[2]:='Тренировка';
+   men[3]:='Вместе';
+   men[4]:='Бой';
+   men[5]:='Загрузить';
+   men[6]:='Редактор';
+   men[7]:='Выход';
    with level do
    case menu(7,1,'') of
     1: begin // Single player game
@@ -5602,7 +5602,7 @@ begin
          first:=level.skill<>0;
          if first then
          begin
-           t:=getlevellist('�஢���');
+           t:=getlevellist('Уровень');
            if t<>0 then begin
               editor:=false; multi:=true; death:=true;
               reswap:=true;

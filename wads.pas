@@ -84,7 +84,7 @@ var
   b: tbmp;
 begin
   fillchar(b,sizeof(b),0);
-  write('�������� ',mask:12,' � ',mask+g:12);
+  write('Извлекаю ',mask:12,' в ',mask+g:12);
   if (upcase(mask)<>'PLAYPAL')
   and
   (b.loadwad(mask)) then begin
@@ -96,7 +96,7 @@ begin
   new(p);
   if pos('.',mask)=0 then system.assign(res,mask{+g}) else system.assign(res,mask);
 {$i-}  rewrite(res,1); {$i+}
-  if ioresult<>0 then begin writeln(' ****** �訡�� ᮧ����� 䠩�� !!!'); dispose(p);exit;end;
+  if ioresult<>0 then begin writeln(' ****** Ошибка создания файла !!!'); dispose(p);exit;end;
   system.seek(f,cur.n);
   system.blockread(f,p^,cur.l);
   system.blockwrite(res,p^,cur.l);
@@ -130,15 +130,15 @@ var
   k,i,sm,sos:longint;
   p: pointer;
 begin
-  write('������ ',ss:10);
+  write('Удаляю ',ss:10);
   k:=getel(ss);
-  if error<>0 then begin writeln(' ******* �� ���� ���� ',ss);exit; end;
+  if error<>0 then begin writeln(' ******* Не могу найти ',ss);exit; end;
 
 
   sm:=filesize(f);
   getmem(p,sm);
   sos:=sm-table^[k+1].n-n*16;
-  write(' (������ ',sos,' ���⮢) ');
+  write(' (двигаю ',sos,' байтов) ');
   seek(f,table^[k+1].n); blockread (f,p^,sos);
   seek(f,table^[k].n);   blockwrite(f,p^,sos);
 
@@ -170,7 +170,7 @@ var
 begin
   system.assign(res,ss);
 {$i-}  system.reset(res,1); {$i+}
-  if ioresult<>0 then begin error:=1; writeln(' ******* �� ���� ���� ',ss,'!!!'); exit;end;
+  if ioresult<>0 then begin error:=1; writeln(' ******* Не могу найти ',ss,'!!!'); exit;end;
   if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
   k.l:=filesize(res);
   k.n:=tab;
@@ -180,7 +180,7 @@ begin
     delete(ss);
   end;
 
-  write('�������� ',ss:10,' � ',name,': ');
+  write('Добавляю ',ss:10,' в ',name,': ');
   k.name:=#0#0#0#0#0#0#0#0;
   for i:=1 to length(ss) do k.name[i]:=ss[i];
   inc(n);
@@ -214,7 +214,7 @@ begin
   fillchar(p,sizeof(p),0);
   p.loadfile(ss);
   if p.x=0 then
-     begin error:=1; writeln(' ******* �� ���� ����㧨�� ',ss,'!!!'); exit;end;
+     begin error:=1; writeln(' ******* Не могу загрузить ',ss,'!!!'); exit;end;
 
   if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
 
@@ -226,7 +226,7 @@ begin
     delete(ss);
   end;
 
-  write('�������� ',ss:10,' � ',name,': ');
+  write('Добавляю ',ss:10,' в ',name,': ');
   k.name:=#0#0#0#0#0#0#0#0; for i:=1 to length(ss) do k.name[i]:=ss[i];
   inc(n);
   table^[n]:=k;
@@ -400,13 +400,13 @@ begin
 {$i-}  system.reset(f,1);{$i+}
  if ioresult<>0 then
    begin
-     writeln('�� ���� ��� 䠩� ',name);
+     writeln('Не могу найти файл ',name);
 {     create(name);}
      loaded:=false;
      exit;
    end;
   system.blockread(f,capt,4);
-  if (c<>capt)and(c2<>capt) then begin system.close(f); writeln(name,'-�� �� IWAD (PWAD) 䠩�');halt;end;
+  if (c<>capt)and(c2<>capt) then begin system.close(f); writeln(name,'-Это не IWAD (PWAD) файл');halt;end;
 
   system.blockread(f,n,4);
   system.blockread(f,tab,4);
@@ -422,24 +422,24 @@ end;
 procedure twad.dir;
 var i:longint;
 begin
-  writeln('���         ������       ������');
+  writeln('Имя         Позиция       Размер');
   for i:=1 to n do
    writeln(table^[i].name,table^[i].n:12,table^[i].l:12);
-  writeln('������ 䠩�� ',name,': ',n*16+tab);
-  writeln('������⮢: ',n);
+  writeln('Размер файла ',name,': ',n*16+tab);
+  writeln('Элементов: ',n);
 end;
 procedure twad.find;
 var i:longint;
 begin
-  writeln('���         ������       ������');
+  writeln('Имя         Позиция       Размер');
   findfirst(ss);
   while error=0 do
   begin
     writeln(cur.name,cur.n:12,cur.l:12);
     findnext;
   end;
-  writeln('������ 䠩�� ',name,': ',n*16+tab);
-  writeln('������⮢: ',n);
+  writeln('Размер файла ',name,': ',n*16+tab);
+  writeln('Элементов: ',n);
 end;
 
 procedure taw.assign(ss:string);
