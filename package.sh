@@ -44,7 +44,6 @@ cp doom.ini "$DIST_DIR/"
 # Ресурсы (без Saves)
 cp -r RF "$DIST_DIR/"
 cp -r Doom "$DIST_DIR/"
-cp -r bots "$DIST_DIR/"
 rm -rf "$DIST_DIR/RF/Saves" "$DIST_DIR/Doom/Saves"
 
 # Документация
@@ -62,7 +61,7 @@ case "$PLATFORM" in
             cp /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 "$DIST_DIR/libs/"
     fi
     # Скрипт запуска
-    cp run.sh "$DIST_DIR/"
+    cp rf.sh "$DIST_DIR/"
     ;;
   win64|win32)
     # SDL2.dll для Windows (должен лежать в проекте)

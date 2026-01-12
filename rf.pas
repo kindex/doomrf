@@ -732,10 +732,10 @@ end;
 
 begin
   while keypressed do readkey;
-  maxl:=10;
+  maxl:=150;
   for i:=1 to max do
-    if length(men[i])>maxl then maxl:=length(men[i]);
-  x1:=(getmaxx-maxl*15)div 2;
+    if wb.width(men[i])>maxl then maxl:=wb.width(men[i]);
+  x1:=(getmaxx-maxl)div 2;
   if x1<30 then x1:=30;
 
   level.endgame:=false;

@@ -7,7 +7,7 @@ unit sdlgraph;
 
 interface
 
-uses sdl2, sdl2_image, sysutils;
+uses sdl2, sdl2_image, sysutils, api;
 
 const
   // Screen constants
@@ -727,6 +727,7 @@ end;
 
 procedure print(x, y: xy; c: color; s: string);
 begin
+  s := upcase(UTF8ToCP866(s));
   case fonth of
     8: print8(x, y, c, s);
     14: print14(x, y, c, s);
