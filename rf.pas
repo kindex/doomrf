@@ -6173,11 +6173,10 @@ begin
 
   time.clear;rtimer.clear; time.fps:=mfps;
   winall:=false;
-  if not level.editor then begin
-    ddx:=1; ddy:=1;  Sensetivity(1,1);
-  end else begin
-    ddx:=6; ddy:=6;  Sensetivity(12,12);
-  end;
+  ddx:=sdlgraph.WINDOW_SCALE;
+  ddy:=sdlgraph.WINDOW_SCALE;
+  Sensetivity(1,1);
+  if level.editor then sdlinput.show else sdlinput.hide;
   mousebox(0,0,getmaxx,getmaxy); loaded:=false;
   unpush:=false; scrmode:=normal; hod:=0;  level.start:=time.tik; speed:=1; si:=true;
   level.alltime:=0;
@@ -6200,7 +6199,6 @@ begin
       ed.move;
       map.move;
       ed.draw;
-      p[cur].sprite(mx,my);
     end;
 
     if level.cheater then wb.print(275,200,'Cheater');
