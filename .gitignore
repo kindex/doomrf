@@ -19,3 +19,6 @@
 libs/libSDL2_image.so
 libs/libSDL2-2.0.so.0
 libs/libSDL2.so
+/link*.res
+/rf
+/doomrf*.tar.gz

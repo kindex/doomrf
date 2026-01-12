@@ -82,13 +82,21 @@ begin
   vlr:=s;
 end;
 
+// Only for CP866 encoding
 function upcase(c:string):string;
 var i:integer;
+    b:byte;
 begin
   SetLength(upcase, length(c));
   for i:=1 to length(c) do
-  if (c[i]>#96)and(c[i]<#123)then upcase[i]:=chr(ord(c[i])-32)
-  else upcase[i]:=c[i]
+  begin
+    b:=ord(c[i]);
+    if (b>96)and(b<123) then upcase[i]:=chr(b-32)        { a-z -> A-Z }
+    else if (b>=160)and(b<=175) then upcase[i]:=chr(b-32) { CP866: а-п -> А-П }
+    else if (b>=224)and(b<=239) then upcase[i]:=chr(b-80) { CP866: р-я -> Р-Я }
+    else if b=241 then upcase[i]:=chr(240)                { CP866: ё -> Ё }
+    else upcase[i]:=c[i];
+  end;
 end;
 
 function downcase(c:string):string;

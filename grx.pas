@@ -950,7 +950,7 @@ procedure tfont.print(ax,ay:integer; s:string);
 var
   i,mx:integer;
 begin
-  s:=UTF8ToCP866(upcase(s));
+  s:=upcase(UTF8ToCP866(s));
 
   mx:=0;
   for i:=1 to length(s) do
@@ -964,7 +964,7 @@ function tfont.width(s:string):integer;
 var
   i,mx:integer;
 begin
-  s:=UTF8ToCP866(upcase(s));
+  s:=upcase(UTF8ToCP866(s));
 
   mx:=0;
   for i:=1 to length(s) do
