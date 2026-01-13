@@ -327,7 +327,6 @@ end;
 function push: boolean;
 begin
   // Use stored state from PollEvents - don't pump again
-  WriteLn('>>>PUSH<<< state=', mouseButtonState, ' LMASK=', SDL_BUTTON_LMASK);
   push := (mouseButtonState and SDL_BUTTON_LMASK) <> 0;
 end;
 

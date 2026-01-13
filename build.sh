@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-FPC="/home/kindex/bin/fpc/bin/fpc"
+# FPC paths
+FPC="/home/kindex/bin/fpc/fpc/bin/x86_64-linux/fpc"
+FPC_CROSS="/home/kindex/bin/fpc/fpc/bin/x86_64-linux/ppcrossx64"
+WIN64_UNITS="-Fu/home/kindex/bin/fpc/fpc/units/x86_64-win64/rtl -Fu/home/kindex/bin/fpc/fpc/units/x86_64-win64/*"
+
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
 
@@ -20,17 +24,12 @@ case "${1:-build}" in
     ;;
   win64)
     echo "Building release (Windows x64)..."
-    $FPC @fpc.cfg -Px86_64 -Twin64 -O3 -Xs rf.pas -o rf.exe
-    echo "Done: rf.exe"
-    ;;
-  win32)
-    echo "Building release (Windows x86)..."
-    $FPC @fpc.cfg -Pi386 -Twin32 -O3 -Xs rf.pas -o rf.exe
+    $FPC_CROSS -Twin64 $WIN64_UNITS -O3 -Xs rf.pas
     echo "Done: rf.exe"
     ;;
   wadedit)
     echo "Building wadedit..."
-    $FPC @fpc.cfg utils/wadedit.pas -o wadedit
+    $FPC @fpc.cfg utils/wadedit.pas
     echo "Done: wadedit"
     ;;
   clean)
@@ -43,7 +42,7 @@ case "${1:-build}" in
     $0 clean && $0 build
     ;;
   *)
-    echo "Usage: $0 {build|debug|release|win64|win32|clean|rebuild|wadedit}"
+    echo "Usage: $0 {build|debug|release|win64|clean|rebuild|wadedit}"
     exit 1
     ;;
 esac

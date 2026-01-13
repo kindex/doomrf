@@ -64,20 +64,20 @@ case "$PLATFORM" in
     cp rf.sh "$DIST_DIR/"
     ;;
   win64|win32)
-    # SDL2.dll для Windows (должен лежать в проекте)
-    if [ -f SDL2.dll ]; then
-        cp SDL2.dll "$DIST_DIR/"
+    # SDL2 DLLs для Windows
+    DLL_COUNT=0
+    for dll in SDL2.dll SDL2_image.dll SDL2_mixer.dll SDL2_ttf.dll \
+               lib*.dll; do
+        if [ -f "$dll" ]; then
+            cp "$dll" "$DIST_DIR/"
+            ((DLL_COUNT++)) || true
+        fi
+    done
+    if [ $DLL_COUNT -eq 0 ]; then
+        echo "WARNING: No DLLs found. Run ./build-win64.sh first to download them."
     else
-        echo "WARNING: SDL2.dll not found. Download from https://libsdl.org/download-2.0.php"
+        echo "Copied $DLL_COUNT DLL files"
     fi
-    # SDL2_image.dll для PNG
-    if [ -f SDL2_image.dll ]; then
-        cp SDL2_image.dll "$DIST_DIR/"
-    else
-        echo "WARNING: SDL2_image.dll not found"
-    fi
-    # Добавить build.bat
-    cp build.bat "$DIST_DIR/"
     ;;
 esac
 
