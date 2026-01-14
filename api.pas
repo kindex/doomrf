@@ -29,7 +29,9 @@ function getfilename(name:string):string;
 begin
   while pos('/',name)<>0 do
     name:=copy(name,pos('/',name)+1,length(name));
-  getfilename:=upcase(name)
+  if pos('.',name)>0 then
+    name:=copy(name,1,pos('.',name)-1);
+  getfilename:=name
 end;
 function fexist(name:string):boolean;
 var
