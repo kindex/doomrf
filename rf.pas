@@ -3566,7 +3566,7 @@ begin
     7:  begin scry:=getmaxy-50; what:=mons; end;
     8:  begin scry:=getmaxy-50; what:=items;end;
     9:  begin scry:=getmaxy-50; what:=func; end;
-    10: begin cool:=not cool; repeat until not sdlinput.push; end;
+    10: begin cool:=not cool; repeat sdlinput.PollEvents until not sdlinput.push; end;
     11: begin scry:=getmaxy; what:=node; end;
     12:begin
          wb.print(100,50,'Комментарии');
@@ -3605,7 +3605,7 @@ begin
    if push then
     case what of
      wall,fillwall:begin
-       repeat until not sdlinput.push;
+       repeat sdlinput.PollEvents until not sdlinput.push;
        i:=(my-scry)div 10;
        if mx>100 then inc(i,4);
        land.mask:=land.mask xor (1 shl (i-1));
@@ -3628,21 +3628,21 @@ begin
         if mx>=(getmaxx-4) then inc(shift)  else
         if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
-       repeat until not sdlinput.push;
+       repeat sdlinput.PollEvents until not sdlinput.push;
       end;
      mons: with mon do
       begin
         if mx>=(getmaxx-4) then inc(shift)  else
         if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
-       repeat until not sdlinput.push;
+       repeat sdlinput.PollEvents until not sdlinput.push;
       end;
      items: with itm do
       begin
         if mx>=(getmaxx-4) then inc(shift)  else
         if (mx<=4)and(shift>0) then dec(shift)
         else  cur:=shift+mx div 60;
-       repeat until not sdlinput.push;
+       repeat sdlinput.PollEvents until not sdlinput.push;
       end;
     end;
   end;
@@ -3654,12 +3654,12 @@ begin
         mons: with mon do
         begin
           map.initmon((mx+map.dx),(my+map.dy),cur,tdest(random(2)),true,true,0);
-          repeat until not sdlinput.push;
+          repeat sdlinput.PollEvents until not sdlinput.push;
         end;
         items:with itm do
         begin
           map.inititem((mx+map.dx),(my+map.dy),0,0,cur,true);
-          repeat until not sdlinput.push;
+          repeat sdlinput.PollEvents until not sdlinput.push;
         end;
         func:
          with fun do
