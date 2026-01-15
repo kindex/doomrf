@@ -80,6 +80,7 @@ var
   it:array[tmaxit]of record
     name:string[40];
     vis:string[32];
+    pickupSound:string[32];
     skin:array[0..maxmonframe]of tnpat;
     weapon,ammo,count,max,longjumpn:longint;
     health,armor,megahealth,god,longjump,
@@ -91,6 +92,7 @@ var
   bul:array[tmaxbul]of record
     name:string[40];
     vis, visr:string[32];
+    hitSound:string[32];
     maxfly,maxflyr,delfly,shot:byte;
     fly, flyr:array[0..maxmonframe]of tnpat;
     hit,freez,fire,mg,prise,g,per,time: real;
@@ -102,6 +104,7 @@ var
   bomb:array[tmaxbomb]of record
     name:string[40];
     vis:string[8];
+    sound:string[32];
     rad,maxfire: longint;
     time,hit,fired: real;
     fire:array[0..maxmonframe]of tnpat;
@@ -109,6 +112,8 @@ var
   weapon:array[-maxweapon..maxweapon]of record
     name:string[40];
     vis:string[32];
+    shotSound:string[32];
+    pickupSound:string[32];
     skin: tnpat;
     bul,pul: tmaxbul;
     mg,prise:real;
@@ -125,6 +130,8 @@ var
     fish, turret, barrel, fly:boolean;
     speed,jumpx,jumpy,acsel,brakes,gun,defangle:real;
     vis:string[32];
+    hitSound:string[32];
+    dieSound:string[32];
     stand,damage,fire,hai:array[tdest]of tnpat;
     turvis: tnpat;
     run,die,bomb, duck:array[0..maxmonframe-1,tdest]of tnpat;
@@ -316,6 +323,8 @@ begin
       if s1='turret' then turret:=boolean(downcase(s2)='true');
       if s1='fly' then fly:=boolean(downcase(s2)='true');
       if s1='turvis' then turvis:=loadasbmp(s2);
+      if s1='hitsound' then hitSound:=s2;
+      if s1='diesound' then dieSound:=s2;
     end;
   end;
   close(f);
@@ -425,6 +434,8 @@ begin
       if s1='realodslot' then reloadslot:=vl(s2);
       if s1='sniper' then sniper:=boolean(downcase(s2)='on');
       if s1='double' then double:=boolean(downcase(s2)='true');
+      if s1='shotsound' then shotSound:=s2;
+      if s1='pickupsound' then pickupSound:=s2;
     end;
   end;
   close(f);
@@ -471,6 +482,7 @@ begin
       if s1='vis' then vis:=s2;
       if s1='hit' then hit:=vlr(s2);
       if s1='fire' then fired:=vlr(s2);
+      if s1='sound' then sound:=s2;
     end;
   end;
   close(f);
@@ -526,6 +538,7 @@ begin
       if s1='staywall' then staywall:=vl(s2);
       if s1='laser' then laser:=s2='true';
       if s1='walldetonate' then walldetonate:=s2='true';
+      if s1='hitsound' then hitSound:=s2;
     end;
   end;
   close(f);
@@ -610,6 +623,7 @@ begin
       if s1='wave' then wave:=vlr(s2);
       if s1='reverse' then reverse:=vlr(s2);
       if s1='shift' then shift:=vlr(s2);
+      if s1='pickupsound' then pickupSound:=s2;
     end;
   end;
   close(f);
