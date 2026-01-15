@@ -2,12 +2,11 @@
 {$Mode Tp}
 program RF; {First verion: 27.2.2001}
 uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2_mixer;
-const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
+const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   game='Doom RF';
-  version='2.0';
-  data='10.01.2026';
-  title:string='DOOM 513' {+version+' ['+data+']'};
-  comment='Alpha 2.0 *** Freeware';
+  version='2.1';
+  data='15.01.2026';
+  title:string='DOOM RF [513] v' {+version+' ['+data+']'};
   shortintro=game+' ['+version+']';
   menutitle='DOOM 513';
 
@@ -476,6 +475,9 @@ var
     chunk: PMix_Chunk;
   end;
   soundCacheCount: integer;
+  menuNavSound: string[32];
+  menuSelectSound: string[32];
+  menuBackSound: string[32];
 
 function LoadSound(name: string): PMix_Chunk; forward;
 procedure InitSound; forward;
@@ -530,6 +532,10 @@ begin
     LoadSound(bomb[i].sound);
   for i := 1 to maxit do
     LoadSound(it[i].pickupSound);
+  { Menu sounds }
+  LoadSound(menuNavSound);
+  LoadSound(menuSelectSound);
+  LoadSound(menuBackSound);
 end;
 
 procedure DoneSound;
@@ -551,6 +557,7 @@ var
   s: string;
 begin
   if name = '' then exit;
+  if debug then writeln('PlaySound: ', name);
 
   { Parse comma-separated sounds }
   count := 0;
@@ -638,12 +645,9 @@ var
   i:integer;
 begin
   writeln('The ',game,' <-> ',version,' [',data,']');
-  writeln(comment);
   for i:=1 to maxtit do begin
     writeln(tit[i]);
   end;
-//  writeln(comment);
-//  writeln;
 {  textattr:=4+8;
   writeln('Запускайте только RF.BAT !!! (иначе у вас не будет работать клавиатура)');
   textattr:=7;}
@@ -835,6 +839,19 @@ begin
 
   screen;
 end;
+procedure nav(newCh: integer);
+begin
+  if ch <> newCh then begin
+    PlaySound(menuNavSound);
+    ch := newCh;
+  end;
+  keyboardMode := true;
+end;
+procedure sel;
+begin
+  PlaySound(menuSelectSound);
+  enter := ch;
+end;
 
 begin
   while keypressed do readkey;
@@ -871,23 +888,25 @@ begin
     begin
       mouseItem := (mouseY - y1) div d + 1;
       ch := mouseItem;
-      if mousePressed and not wasMousePressed then
+      if mousePressed and not wasMousePressed then begin
+        PlaySound(menuSelectSound);
         enter := mouseItem;
+      end;
     end;
     wasMousePressed := mousePressed;
     if quit_requested then break;
     if keypressed then
     case readkey of
-      #13: enter:=ch;
-      #27: break;
-      #9:  ch:=(ch)mod max+1;
+      #13: sel;
+      #27: begin PlaySound(menuBackSound); break; end;
+      #9:  nav((ch) mod max + 1);
       #0:case readkey of
-        #80: begin if ch<max then inc(ch); keyboardMode:=true; end; {Down}
-        #72: begin if ch>1 then dec(ch); keyboardMode:=true; end;   {Up}
-        #73: begin ch:=1; keyboardMode:=true; end;   {PgUp}
-        #81: begin ch:=max; keyboardMode:=true; end; {PgDn}
-        #71: begin ch:=1; keyboardMode:=true; end;   {Home}
-        #79: begin ch:=max; keyboardMode:=true; end; {End}
+        #80: if ch<max then nav(ch+1);   {Down}
+        #72: if ch>1 then nav(ch-1);     {Up}
+        #73: nav(1);                      {PgUp}
+        #81: nav(max);                    {PgDn}
+        #71: nav(1);                      {Home}
+        #79: nav(max);                    {End}
        end;
     end;
   until (enter>0) or quit_requested;
@@ -996,6 +1015,10 @@ begin
       if s1='start' then startbmp:=s2;
       if s1='win' then winbmp:=s2;
       if s1='lose' then losebmp:=s2;
+
+      if s1='menunavsound' then menuNavSound:=s2;
+      if s1='menuselectsound' then menuSelectSound:=s2;
+      if s1='menubacksound' then menuBackSound:=s2;
     end;
   end;
 end;
@@ -5844,6 +5867,7 @@ begin
   noImage:=loadbmp('error');
 //  level.loadini(runmod+'\mod.ini');
   loadmodfile(a+'/mod.ini');
+  writeln('Menu sounds: nav=',menuNavSound,' sel=',menuSelectSound,' back=',menuBackSound);
   {  if upcase(lastinidir)<>upcase(inidir) then }
   loading(maininidir);
   if (maininidir<>inidir) then
