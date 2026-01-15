@@ -1,7 +1,7 @@
 {$Ifndef FPC} Turbo Pascal not supported. Only Free Pascal{$endif}
 {$Mode Tp}
 program RF; {First verion: 27.2.2001}
-uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos;
+uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2_mixer;
 const {(C) DiVision: kIndeX , Zonik , Dark Sirius }
   game='Doom RF';
   version='2.0';
@@ -468,8 +468,111 @@ var
     delay: ttime;
   end;
 
+{ Sound system }
+var
+  soundEnabled: boolean;
+  soundCache: array[0..63] of record
+    name: string[32];
+    chunk: PMix_Chunk;
+  end;
+  soundCacheCount: integer;
+
+function LoadSound(name: string): PMix_Chunk; forward;
+procedure InitSound; forward;
+procedure DoneSound; forward;
+procedure PlaySound(name: string); forward;
+
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
+
+{ Sound system implementation }
+function LoadSound(name: string): PMix_Chunk;
+var i: integer; path: string;
+begin
+  LoadSound := nil;
+  if (not soundEnabled) or (name = '') then exit;
+  for i := 0 to soundCacheCount - 1 do
+    if soundCache[i].name = name then begin
+      LoadSound := soundCache[i].chunk;
+      exit;
+    end;
+  if soundCacheCount < 64 then begin
+    path := 'RF/sfx/' + name + #0;
+    soundCache[soundCacheCount].name := name;
+    soundCache[soundCacheCount].chunk := Mix_LoadWAV(@path[1]);
+    LoadSound := soundCache[soundCacheCount].chunk;
+    inc(soundCacheCount);
+  end;
+end;
+
+procedure InitSound;
+var i: integer;
+begin
+  soundEnabled := false;
+  soundCacheCount := 0;
+  if Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 2048) < 0 then begin
+    exit;
+  end;
+  Mix_AllocateChannels(16);
+  soundEnabled := true;
+
+  for i := -maxweapon to maxweapon do begin
+    LoadSound(weapon[i].shotSound);
+    LoadSound(weapon[i].pickupSound);
+  end;
+  for i := 1 to maxmontip do begin
+    LoadSound(monster[i].hitSound);
+    LoadSound(monster[i].dieSound);
+  end;
+  for i := 1 to maxbul do
+    LoadSound(bul[i].hitSound);
+  for i := 1 to maxbomb do
+    LoadSound(bomb[i].sound);
+  for i := 1 to maxit do
+    LoadSound(it[i].pickupSound);
+end;
+
+procedure DoneSound;
+var i: integer;
+begin
+  if not soundEnabled then exit;
+  for i := 0 to soundCacheCount - 1 do
+    if soundCache[i].chunk <> nil then
+      Mix_FreeChunk(soundCache[i].chunk);
+  Mix_CloseAudio;
+  soundEnabled := false;
+end;
+
+procedure PlaySound(name: string);
+var
+  chunk: PMix_Chunk;
+  sounds: array[0..7] of string[32];
+  count, i, p: integer;
+  s: string;
+begin
+  if name = '' then exit;
+
+  { Parse comma-separated sounds }
+  count := 0;
+  s := name + ',';
+  while (pos(',', s) > 0) and (count < 8) do begin
+    p := pos(',', s);
+    sounds[count] := copy(s, 1, p - 1);
+    delete(s, 1, p);
+    while (length(sounds[count]) > 0) and (sounds[count][1] = ' ') do
+      delete(sounds[count], 1, 1);
+    if sounds[count] <> '' then inc(count);
+  end;
+
+  if count = 0 then exit;
+
+  { Pick random sound }
+  i := random(count);
+  chunk := LoadSound(sounds[i]);
+  if chunk <> nil then
+    Mix_PlayChannel(-1, chunk, 0);
+end;
+
 procedure tmsg.init(ax,ay,asx,asy: integer; a:string);
 begin
   enable:=true;
@@ -1587,6 +1690,7 @@ begin
      ok:=takehealth(it[nn].health)or ok;
   if it[nn].megahealth<>0 then
      ok:=takemegahealth(it[nn].megahealth) or ok;
+  if ok then PlaySound(it[nn].pickupSound);
   takeitem:=ok;
 end;
 procedure tplayer.settip(at:integer);
@@ -2328,6 +2432,7 @@ begin
       px,py,weapon[nweap].pul,who, qdamage.en);
     end;
     if state<>duck then setstate(fire,0.1);
+    PlaySound(weapon[nweap].shotSound);
   end;
   end;
 end;
@@ -2488,6 +2593,7 @@ begin
          bul[tip].freez*qdamage,
          who,dx*bloodu,dy*bloodu);
          map.m^[i].dx:=map.m^[i].dx+dx*0.1;
+         PlaySound(bul[tip].hitSound);
          detonate;
          check:=true;
          exit;
@@ -2590,6 +2696,7 @@ begin
   x:=ax; y:=ay; tip:=at;
   vis:=1; who:=aw;
   life.init(bomb[tip].time);
+  PlaySound(bomb[tip].sound);
   s:=bomb[tip].rad{*2};
   if (bomb[tip].hit<>0)or(bomb[tip].fired<>0)then
   for i:=0 to maxmon do
@@ -2729,6 +2836,7 @@ procedure tmon.kill;
 begin
   if not life then exit;
   setcurstate(die,monster[tip].diei.delay);
+  PlaySound(monster[tip].dieSound);
   giveweapon;
   dier(dwho);
 end;
@@ -2736,6 +2844,7 @@ procedure tmon.explode;
 begin
   if not life then exit;
   setcurstate(crash,monster[tip].bombi.delay);
+  PlaySound(monster[tip].dieSound);
   giveweapon;
   dier(dwho);
 end;
@@ -6161,6 +6270,7 @@ begin
 //  initgraph(res);
   mx:=640; my:=480;
   setmode(mx,my); setpal;
+  InitSound;
   Sensetivity(sdlgraph.WINDOW_SCALE, sdlgraph.WINDOW_SCALE);
   loadfont(maininidir,8);
   getmaxx:=mx; getmaxy:=my;
@@ -6248,6 +6358,7 @@ begin
   winall:=false;
  until quit_requested;
   {End game}
+  DoneSound;
   closegraph;
 //  map.done;
 
