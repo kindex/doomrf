@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-VERSION="2.0"
+# Extract version from rf.pas: version='X.X';
+VERSION=$(grep -oP "version='\\K[^']+" rf.pas)
 PLATFORM="${1:-linux64}"
 
 case "$PLATFORM" in
