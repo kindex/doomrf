@@ -64,7 +64,7 @@ var
 
 
 implementation
-uses sprites,sdlgraph;
+uses tbmp;
 
 var curpos:longint;
 
@@ -81,7 +81,7 @@ procedure twad.extractfile(mask,g:string);
 var
   p:^tarray;
   res:file;
-  b: tbmp;
+  b: tbmpobj;
 begin
   fillchar(b,sizeof(b),0);
   write('Извлекаю ',mask:12,' в ',mask+g:12);
@@ -93,14 +93,14 @@ begin
   end
   else begin
   getel(mask);
-  new(p);
+  getmem(p, cur.l);
   if pos('.',mask)=0 then system.assign(res,mask{+g}) else system.assign(res,mask);
 {$i-}  rewrite(res,1); {$i+}
-  if ioresult<>0 then begin writeln(' ****** Ошибка создания файла !!!'); dispose(p);exit;end;
+  if ioresult<>0 then begin writeln(' ****** Ошибка создания файла !!!'); freemem(p, cur.l);exit;end;
   system.seek(f,cur.n);
   system.blockread(f,p^,cur.l);
   system.blockwrite(res,p^,cur.l);
-  dispose(p);
+  freemem(p, cur.l);
   system.close(res);
  end;
   writeln('Ok':5)
@@ -209,7 +209,7 @@ var
   i:integer;
   reads:word;
   x,y,dx,dy,ost,t:longint;
-  p: tbmp;
+  p: tbmpobj;
 begin
   fillchar(p,sizeof(p),0);
   p.loadfile(ss);
