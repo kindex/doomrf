@@ -10,6 +10,7 @@ type
   tel=object
     n {Pos},l {Size}:longint;
     name:array[1..8]of char;
+    curpos:longint;
     function getname:string;
     procedure read(var f:file; var p; s:longint);
     procedure assign(var f:file; w:longint);
@@ -65,8 +66,6 @@ var
 
 implementation
 uses tbmp;
-
-var curpos:longint;
 
 procedure twad.extract(mask,g:string);
 begin
@@ -266,8 +265,13 @@ end;
 procedure twad.assign(ss:string);
 var i:longint;
 begin
-  i:=getel(upcase(ss));
-  if error=0 then cur.assign(f,tab+i*16-16)
+  ss:=upcase(getfilename(ss));
+  if pos('.',ss)>0 then ss:=copy(ss,1,pos('.',ss)-1);
+  i:=getel(ss);
+  { getel already sets cur := table^[i] with correct n, l, name }
+  { Just reset curpos for sequential reading }
+  if error=0 then
+    cur.curpos := 0;
 end;
 procedure tel.seek(w:longint);
 begin
@@ -286,13 +290,15 @@ begin
 {  end;}
 end;
 procedure tel.read(var f:file; var p; s:longint);
+var
+  actual: longint;
 begin
 //  if curpos+s>l then s:=l-curpos;
-{  writeln(n);
-  writeln(curpos);}
+  writeln('tel.read: seek to ', n+curpos, ' read ', s, ' bytes (lump size=', l, ')');
 
   system.seek(f,n+curpos);
-  system.blockread(f,p,s);
+  system.blockread(f,p,s,actual);
+  writeln('  blockread actual=', actual);
   inc(curpos,s);
 end;
 procedure twad.close;
@@ -412,9 +418,13 @@ begin
   system.blockread(f,tab,4);
   system.seek(f,tab);
   new(table);
-{  getmem(table,n*16);}
-  system.blockread(f,table^,16*n);
-{  for i:=1 to n do begin   system.blockread(f,table^[i],16); end;}
+  { Read each entry separately: WAD entries are 16 bytes, but tel is 20 bytes (has curpos) }
+  for i:=1 to n do begin
+    system.blockread(f,table^[i].n,4);
+    system.blockread(f,table^[i].l,4);
+    system.blockread(f,table^[i].name,8);
+    table^[i].curpos:=0;
+  end;
   loaded:=true;
 
   writeln(name+' loaded (',n,' items)');

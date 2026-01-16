@@ -169,6 +169,8 @@ begin
     else
       pkey[i] := false;
   end;
+  // Right Ctrl works as Left Ctrl (for fire)
+  pkey[29] := pkey[29] or (state[SDL_SCANCODE_RCTRL] <> 0);
 end;
 
 function SDLKeyToChar(const keysym: TSDL_Keysym): char;

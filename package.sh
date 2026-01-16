@@ -44,7 +44,6 @@ cp doom.ini "$DIST_DIR/"
 
 # Ресурсы (без Saves)
 cp -r RF "$DIST_DIR/"
-cp -r Doom "$DIST_DIR/"
 rm -rf "$DIST_DIR/RF/Saves" "$DIST_DIR/Doom/Saves"
 
 # Документация
