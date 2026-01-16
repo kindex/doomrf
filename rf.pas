@@ -63,6 +63,8 @@ const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   truptime=45;
   reswaptime:integer=60;  monswaptime:integer=30;
   botsee:array[1..5]of integer=(800,600,400,200,0);
+  soundMaxDist = 800;  { макс. дистанция слышимости в пикселях (100 клеток) }
+  menuVolume = 48;     { громкость звуков меню (0-128) }
   edwallstr:array[1..8]of string[16]=
   ('Стена',  'Ступень',  'Вода',  'Лава',  '<< /Over',  '>> /Over',  'Function',  'Deathmatch');
 {  ednodestr:array[1..4]of string[16]=
@@ -484,6 +486,8 @@ function LoadSound(name: string): PMix_Chunk; forward;
 procedure InitSound; forward;
 procedure DoneSound; forward;
 procedure PlaySound(name: string); forward;
+procedure PlaySoundVolume(name: string; volume: byte); forward;
+procedure PlaySoundAt(name: string; sx, sy: real); forward;
 
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
@@ -585,6 +589,93 @@ begin
   chunk := LoadSound(sounds[i]);
   if chunk <> nil then
     Mix_PlayChannel(-1, chunk, 0);
+end;
+
+procedure PlaySoundVolume(name: string; volume: byte);
+var
+  chunk: PMix_Chunk;
+  sounds: array[0..7] of string[32];
+  count, i, p, channel: integer;
+  s: string;
+begin
+  if name = '' then exit;
+  count := 0;
+  s := name + ',';
+  while (pos(',', s) > 0) and (count < 8) do begin
+    p := pos(',', s);
+    sounds[count] := copy(s, 1, p - 1);
+    delete(s, 1, p);
+    while (length(sounds[count]) > 0) and (sounds[count][1] = ' ') do
+      delete(sounds[count], 1, 1);
+    if sounds[count] <> '' then inc(count);
+  end;
+  if count = 0 then exit;
+  i := random(count);
+  chunk := LoadSound(sounds[i]);
+  if chunk <> nil then begin
+    channel := Mix_PlayChannel(-1, chunk, 0);
+    if channel >= 0 then
+      Mix_Volume(channel, volume);
+  end;
+end;
+
+function CalcSoundAngle(sx, sy, lx, ly: real): smallint;
+var dx, dy, angle: real;
+begin
+  dx := sx - lx;
+  dy := ly - sy;
+  if (dx = 0) and (dy = 0) then begin CalcSoundAngle := 0; exit; end;
+  if dx = 0 then begin
+    if dy > 0 then CalcSoundAngle := 0 else CalcSoundAngle := 180;
+    exit;
+  end;
+  angle := arctan(dy / dx) * 180 / pi;
+  if dx < 0 then angle := angle + 180
+  else if dy < 0 then angle := angle + 360;
+  CalcSoundAngle := round(angle) mod 360;
+end;
+
+function CalcSoundDistance(sx, sy, lx, ly: real): byte;
+var dx, dy, dist: real;
+begin
+  dx := sx - lx;
+  dy := sy - ly;
+  dist := sqrt(dx*dx + dy*dy);
+  if dist > soundMaxDist then CalcSoundDistance := 255
+  else CalcSoundDistance := round((dist / soundMaxDist) * 255);
+end;
+
+procedure PlaySoundAt(name: string; sx, sy: real);
+var
+  chunk: PMix_Chunk;
+  sounds: array[0..7] of string[32];
+  count, i, p, channel: integer;
+  s: string;
+  lx, ly: real;
+begin
+  if name = '' then exit;
+  count := 0;
+  s := name + ',';
+  while (pos(',', s) > 0) and (count < 8) do begin
+    p := pos(',', s);
+    sounds[count] := copy(s, 1, p-1);
+    delete(s, 1, p);
+    while (length(sounds[count]) > 0) and (sounds[count][1] = ' ') do
+      delete(sounds[count], 1, 1);
+    if sounds[count] <> '' then inc(count);
+  end;
+  if count = 0 then exit;
+  i := random(count);
+  chunk := LoadSound(sounds[i]);
+  if chunk <> nil then begin
+    channel := Mix_PlayChannel(-1, chunk, 0);
+    if (channel >= 0) and (player[1].hero > 0) then begin
+      lx := map.m^[player[1].hero].getcx;
+      ly := map.m^[player[1].hero].getcy;
+      Mix_SetPosition(channel, CalcSoundAngle(sx, sy, lx, ly),
+                               CalcSoundDistance(sx, sy, lx, ly));
+    end;
+  end;
 end;
 
 procedure tmsg.init(ax,ay,asx,asy: integer; a:string);
@@ -849,14 +940,14 @@ end;
 procedure nav(newCh: integer);
 begin
   if ch <> newCh then begin
-    PlaySound(menuNavSound);
+    PlaySoundVolume(menuNavSound, menuVolume);
     ch := newCh;
   end;
   keyboardMode := true;
 end;
 procedure sel;
 begin
-  PlaySound(menuSelectSound);
+  PlaySoundVolume(menuSelectSound, menuVolume);
   enter := ch;
 end;
 
@@ -905,7 +996,7 @@ begin
     if keypressed then
     case readkey of
       #13: sel;
-      #27: begin PlaySound(menuBackSound); break; end;
+      #27: begin PlaySoundVolume(menuBackSound, menuVolume); break; end;
       #9:  nav((ch) mod max + 1);
       #0:case readkey of
         #80: if ch<max then nav(ch+1);   {Down}
@@ -2462,7 +2553,7 @@ begin
       px,py,weapon[nweap].pul,who, qdamage.en);
     end;
     if state<>duck then setstate(fire,0.1);
-    PlaySound(weapon[nweap].shotSound);
+    PlaySoundAt(weapon[nweap].shotSound, getcx, getcy);
   end;
   end;
 end;
@@ -2604,6 +2695,7 @@ begin
         map.randompix(x-8*l,savey{+dy},0,0,5,5,blow);
       if bul[tip].staywall>0 then
         map.inititem(x-8*l,y,dx,dy,bul[tip].staywall,false);
+      PlaySoundAt(bul[tip].hitSound, x, y);
       detonate;
       exit;
     end;
@@ -2623,7 +2715,6 @@ begin
          bul[tip].freez*qdamage,
          who,dx*bloodu,dy*bloodu);
          map.m^[i].dx:=map.m^[i].dx+dx*0.1;
-         PlaySound(bul[tip].hitSound);
          detonate;
          check:=true;
          exit;
@@ -2726,7 +2817,7 @@ begin
   x:=ax; y:=ay; tip:=at;
   vis:=1; who:=aw;
   life.init(bomb[tip].time);
-  PlaySound(bomb[tip].sound);
+  PlaySoundAt(bomb[tip].sound, x, y);
   s:=bomb[tip].rad{*2};
   if (bomb[tip].hit<>0)or(bomb[tip].fired<>0)then
   for i:=0 to maxmon do
@@ -2866,7 +2957,7 @@ procedure tmon.kill;
 begin
   if not life then exit;
   setcurstate(die,monster[tip].diei.delay);
-  PlaySound(monster[tip].dieSound);
+  PlaySoundAt(monster[tip].dieSound, getcx, getcy);
   giveweapon;
   dier(dwho);
 end;
@@ -2874,7 +2965,7 @@ procedure tmon.explode;
 begin
   if not life then exit;
   setcurstate(crash,monster[tip].bombi.delay);
-  PlaySound(monster[tip].dieSound);
+  PlaySoundAt(monster[tip].dieSound, getcx, getcy);
   giveweapon;
   dier(dwho);
 end;
@@ -2954,7 +3045,7 @@ begin
 
   { Play hit sound if damage was dealt and monster is still alive }
   if (hit+bomb > 0) and (health > 0) then
-    PlaySound(monster[tip].hitSound);
+    PlaySoundAt(monster[tip].hitSound, getcx, getcy);
 
   if (health<=0)and l then
     if (bomb>0)or(freez.en) then begin explode(dwho); freez.clear; end
@@ -3081,7 +3172,7 @@ end;
 
   { Play fall sound when landing after a high fall (players only) }
   if (hero > 0) and standing and not wasStanding and (prevDy > 6) then
-    PlaySound('dsoof.wav');
+    PlaySoundAt('dsoof.wav', getcx, getcy);
 
   if freez.en then exit;
 //  if deldam.en>0 then dec(deldam);
@@ -3368,7 +3459,7 @@ begin
     { Play sight sound when monster first sees player }
     if see and not sawPlayer then begin
       sawPlayer := true;
-      PlaySound(monster[tip].sightSound);
+      PlaySoundAt(monster[tip].sightSound, getcx, getcy);
     end;
     if not see then sawPlayer := false;
 
@@ -3378,12 +3469,12 @@ begin
     if know and not see then begin
       { Check direction change }
       if dest <> prevDest then begin
-        PlaySound(monster[tip].actSound);
+        PlaySoundAt(monster[tip].actSound, getcx, getcy);
         prevDest := dest;
       end
       { Check stopping (speed dropped to near zero) }
       else if wasMoving and (abs(dx) < 0.5) then begin
-        PlaySound(monster[tip].actSound);
+        PlaySoundAt(monster[tip].actSound, getcx, getcy);
         wasMoving := false;
       end;
       { Track if monster is moving }
@@ -4280,7 +4371,7 @@ begin
           end;}
 
           if (typeof(tPix)<>typeof(self)) and (f^[i].tip=13)then begin
-            PlaySound('dstelept.wav');
+            PlaySoundAt('dstelept.wav', self.x, self.y);
             initbomb(round(self.x),round(self.y-self.getsy*4),reswapbomb,0);
           end;
           exit;
@@ -5263,11 +5354,11 @@ begin
         case tip of
          1: begin
               initmon(x,y,curtip,dest,true,true,0);
-              PlaySound('dsbospn.wav');
+              PlaySoundAt('dsbospn.wav', x, y);
             end;
          2: begin
               inititem(x,y,0,0,curtip,true);
-              PlaySound('dsitmbk.wav');
+              PlaySoundAt('dsitmbk.wav', x, y);
             end;
         end;
         tip:=0;
