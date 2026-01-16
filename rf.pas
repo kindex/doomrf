@@ -3212,7 +3212,8 @@ begin
   begin
     if inwater or ((getg=0)and not standing)then dy:={dy+}monster[tip].jumpy*0.5*usk
     else
-     if not inwall(cstand) and ((getgrid and cstand)=0) then begin
+     if (not inwall(cstand) and ((getgrid and cstand)=0)) or
+        (inwall(cstand) and ((getgrid and cwall)>0)) then begin
        savedel:=0;
        setstate(duck,0.1);
      end
