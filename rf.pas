@@ -25,7 +25,6 @@ const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   defence2:real=1/3;
   fraglimit:integer=-1;
   mousepl=4;
-  kniferange=20;
   oxysec=10;
   bombfire=4;
   reswapbomb=2;
@@ -788,40 +787,55 @@ begin
     (abs((getcy+getsy*4)-ay)<=16));
 end;
 
-function checkLOS(x1,y1,x2,y2: integer): boolean;
+function checkLOS(x1,y1,x2,y2,sy1,sy2: integer): boolean;
 var
-  cx, cy, dx, dy: integer;
+  cx, cy, dx, dy, h1, h2, ty: integer;
+  blocked: boolean;
 begin
   checkLOS := true;
 
-  // Горизонтальная проверка стен
-  if x1 < x2 then dx := 4 else dx := -4;
-  cx := x1;
-  while abs(x2 - cx) > 6 do
+  // Кросс-проверка: от каждой высоты атакующего до каждой высоты цели
+  // Если хотя бы одна линия свободна - атака возможна
+  blocked := true;
+  for h1 := ord(sy1 > 2) to sy1-1 do  // Пропустить пол если стоит
   begin
-    if (map.land[y1 div 8 - 2]^[cx div 8].land and cwall) > 0 then
+    for h2 := ord(sy2 > 2) to sy2-1 do
     begin
-      checkLOS := false;
-      exit;
+      ty := (y2 div 8) - h2;
+
+      // Горизонтальная проверка стен
+      if x1 < x2 then dx := 4 else dx := -4;
+      cx := x1;
+      while abs(x2 - cx) > 6 do
+      begin
+        if (map.land[(y1 div 8) - h1]^[cx div 8].land and cwall) > 0 then
+          break;
+        cx := cx + dx;
+      end;
+      if abs(x2 - cx) > 6 then continue;  // Горизонталь заблокирована
+
+      // Вертикальная проверка - только стены, не пол
+      cy := (y1 div 8) - h1;
+      if cy <> ty then
+      begin
+        if cy < ty then dy := 1 else dy := -1;
+        while cy <> ty do
+        begin
+          cy := cy + dy;
+          if (map.land[cy]^[x2 div 8].land and cwall) > 0 then
+            break;
+        end;
+        if cy <> ty then continue;  // Вертикаль заблокирована
+      end;
+
+      // Линия свободна!
+      blocked := false;
+      break;
     end;
-    cx := cx + dx;
+    if not blocked then break;
   end;
 
-  // Вертикальная проверка пола/потолка
-  if y1 div 8 <> y2 div 8 then
-  begin
-    if y1 < y2 then dy := 1 else dy := -1;
-    cy := y1 div 8;
-    while cy <> y2 div 8 do
-    begin
-      cy := cy + dy;
-      if (map.land[cy]^[x2 div 8].land and (cwall + cstand)) > 0 then
-      begin
-        checkLOS := false;
-        exit;
-      end;
-    end;
-  end;
+  if blocked then checkLOS := false;
 end;
 
 procedure tinfo.clear;
@@ -2558,10 +2572,14 @@ begin
        (map.m^[i].getcx+map.m^[i].getsx*4+s>rx)and
        (map.m^[i].getcx-map.m^[i].getsx*4-s<rx)and
        (map.m^[i].getcy+map.m^[i].getsy*4+s>ry)and
-       (map.m^[i].getcy-map.m^[i].getsy*4-s<ry)and
-       checkLOS(round(rx), round(ry), round(map.m^[i].getcx), round(map.m^[i].getcy))
-       then
-         map.m^[i].damage(round(map.m^[i].getcx),round(map.m^[i].y-map.m^[i].getsy*6),weapon[nweap].hit*w[nweap],0,0,0,who,0,0);
+       (map.m^[i].getcy-map.m^[i].getsy*4-s<ry)
+       then begin
+         map.m^[i].clearwall(cwall);  // Временно убрать cwall цели для checkLOS
+         if checkLOS(round(rx), round(y), round(map.m^[i].getcx), round(map.m^[i].y), getsy, map.m^[i].getsy)
+         then
+           map.m^[i].damage(round(map.m^[i].getcx),round(map.m^[i].y-map.m^[i].getsy*6),weapon[nweap].hit*w[nweap],0,0,0,who,0,0);
+         map.m^[i].fillwall(cwall);   // Восстановить cwall цели
+       end;
      end;
   end;
   setdelay(weapon[nweap].shot);
