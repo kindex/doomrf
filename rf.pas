@@ -178,7 +178,8 @@ type
   end;
   tstate=(stand,run,fire,die,crash,hack,hai, duck);
   tmon=object(tobj)
-     life,ai,know,see,barrel,aqua,sniperman: boolean;
+     life,ai,know,see,sawPlayer,wasMoving,barrel,aqua,sniperman: boolean;
+     prevDest: tdest;
      target: record x,y,mon:integer end;
      who,lastwho: integer{0..maxmon};
      angle,co,si: real;
@@ -525,7 +526,13 @@ begin
   for i := 1 to maxmontip do begin
     LoadSound(monster[i].hitSound);
     LoadSound(monster[i].dieSound);
+    LoadSound(monster[i].sightSound);
+    LoadSound(monster[i].actSound);
   end;
+  { Player sounds }
+  LoadSound('dsoof.wav');
+  LoadSound('dsitmbk.wav');
+  LoadSound('dstelept.wav');
   for i := 1 to maxbul do
     LoadSound(bul[i].hitSound);
   for i := 1 to maxbomb do
@@ -2945,6 +2952,10 @@ begin
   for i:=1 to min(32,round((hit+bomb)*5)) do
     map.randompix(ax,ay,dx+adx,dy+ady,5,5,blow);
 
+  { Play hit sound if damage was dealt and monster is still alive }
+  if (hit+bomb > 0) and (health > 0) then
+    PlaySound(monster[tip].hitSound);
+
   if (health<=0)and l then
     if (bomb>0)or(freez.en) then begin explode(dwho); freez.clear; end
     else kill(dwho);
@@ -2991,7 +3002,8 @@ end;
 procedure tmon.move;
 var
   i:integer;
-  ldx: real;
+  ldx, prevDy: real;
+  wasStanding: boolean;
 begin
 {  if life then }clearwall(cwall+cdeath);
 
@@ -3060,7 +3072,16 @@ begin
 end;
 
   if monster[tip].turret then begin dx:=0; dy:=0; end;
+
+  { Save state before move for fall sound }
+  wasStanding := standing;
+  prevDy := dy;
+
   tobj.move;
+
+  { Play fall sound when landing after a high fall (players only) }
+  if (hero > 0) and standing and not wasStanding and (prevDy > 6) then
+    PlaySound('dsoof.wav');
 
   if freez.en then exit;
 //  if deldam.en>0 then dec(deldam);
@@ -3342,6 +3363,31 @@ begin
       si:=sin(angle);
       co:=cos(angle);
       if not map.m^[target.mon].life then see:=false else movesee;
+    end;
+
+    { Play sight sound when monster first sees player }
+    if see and not sawPlayer then begin
+      sawPlayer := true;
+      PlaySound(monster[tip].sightSound);
+    end;
+    if not see then sawPlayer := false;
+
+    { Play active sound when monster knows about player but doesn't see:
+      - when changing direction (left<->right)
+      - when stopping (was moving, now stopped) }
+    if know and not see then begin
+      { Check direction change }
+      if dest <> prevDest then begin
+        PlaySound(monster[tip].actSound);
+        prevDest := dest;
+      end
+      { Check stopping (speed dropped to near zero) }
+      else if wasMoving and (abs(dx) < 0.5) then begin
+        PlaySound(monster[tip].actSound);
+        wasMoving := false;
+      end;
+      { Track if monster is moving }
+      if abs(dx) > 1 then wasMoving := true;
     end;
   end;
 
@@ -4233,8 +4279,10 @@ begin
             self.y:=self.y-1; dec(self.my); self.ly:=self.my div 8;
           end;}
 
-          if (typeof(tPix)<>typeof(self)) and (f^[i].tip=13)then
+          if (typeof(tPix)<>typeof(self)) and (f^[i].tip=13)then begin
+            PlaySound('dstelept.wav');
             initbomb(round(self.x),round(self.y-self.getsy*4),reswapbomb,0);
+          end;
           exit;
         end;
       end;
@@ -5213,8 +5261,14 @@ begin
       with must[i] do
       begin
         case tip of
-         1: initmon(x,y,curtip,dest,true,true,0);
-         2: inititem(x,y,0,0,curtip,true);
+         1: begin
+              initmon(x,y,curtip,dest,true,true,0);
+              PlaySound('dsbospn.wav');
+            end;
+         2: begin
+              inititem(x,y,0,0,curtip,true);
+              PlaySound('dsitmbk.wav');
+            end;
         end;
         tip:=0;
         initbomb(x,y-16,reswapbomb,-1);

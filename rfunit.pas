@@ -132,6 +132,8 @@ var
     vis:string[32];
     hitSound:string[32];
     dieSound:string[32];
+    sightSound:string[32];
+    actSound:string[32];
     stand,damage,fire,hai:array[tdest]of tnpat;
     turvis: tnpat;
     run,die,bomb, duck:array[0..maxmonframe-1,tdest]of tnpat;
@@ -325,6 +327,8 @@ begin
       if s1='turvis' then turvis:=loadasbmp(s2);
       if s1='hitsound' then hitSound:=s2;
       if s1='diesound' then dieSound:=s2;
+      if s1='sightsound' then sightSound:=s2;
+      if s1='actsound' then actSound:=s2;
     end;
   end;
   close(f);
