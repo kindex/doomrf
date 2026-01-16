@@ -1443,6 +1443,7 @@ var
   a,bb: string;
 begin
   if not enable then exit;
+  PlaySound('dsswtchn.wav');
   j:=id+1;
   with map do begin
     x1:=(round(f^[j].x) div 8);
