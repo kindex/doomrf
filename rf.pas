@@ -2499,6 +2499,10 @@ var
   i,j,k:longint;
 begin
   if (delay.en)or not life then exit;
+  { AI monsters don't attack dead targets }
+  if ai then
+    if (target.mon < 0) then exit
+    else if not map.m^[target.mon].life then exit;
   if state=duck then kh:=0.5 else kh:=1;
   case dest of
    left: l:=-1;
@@ -2923,6 +2927,8 @@ begin
     gett2:='Бота '+st(a)
 end;
 procedure tmon.dier;
+var
+  i: integer;
 begin
   if not life then exit;
 
@@ -2964,6 +2970,16 @@ begin
 end;
   setdelay(truptime);
   life:=false;
+
+  { Monsters forget about dead target }
+  for i := 0 to maxmon do
+    if map.m^[i].enable and (map.m^[i].target.mon = who) then begin
+      map.m^[i].target.mon := -1;
+      map.m^[i].target.x := -9999;
+      map.m^[i].target.y := -9999;
+      map.m^[i].know := false;
+      map.m^[i].see := false;
+    end;
 
 {  if (hero>0)and(lastwho>0)then
   begin
@@ -3536,9 +3552,9 @@ begin
 
     if (weap=1)or((fired.en)and(clever or level.sniper)) then if target.x<self.getcx then include(key,kleft) else include(key,kright);
   end;
-  if see then begin include(key,katack); know:=true; end;
+  if see and (target.mon >= 0) then if map.m^[target.mon].life then begin include(key,katack); know:=true; end;
 
-  if onhead(target.x,target.y) then begin
+  if (target.mon >= 0) then if map.m^[target.mon].life and onhead(target.x,target.y) then begin
      know:=true;
      if clever then begin
        include(key,katack);
