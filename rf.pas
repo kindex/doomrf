@@ -229,6 +229,7 @@ type
      procedure runright;
      procedure jump;
      procedure move; virtual;
+     function check:boolean; virtual;
      procedure checkstep;
      procedure damage(ax,ay:integer; hit,bomb,coxy,afreez:real; dwho:integer; adx,ady: real);
      procedure setstate(astate:tstate; ad: real);
@@ -785,6 +786,42 @@ begin
   onhead:=(abs(ax-getcx)<getsx*8)and
    ((abs((getcy-getsy*4)-ay)<=16)or
     (abs((getcy+getsy*4)-ay)<=16));
+end;
+
+function checkLOS(x1,y1,x2,y2: integer): boolean;
+var
+  cx, cy, dx, dy: integer;
+begin
+  checkLOS := true;
+
+  // Горизонтальная проверка стен
+  if x1 < x2 then dx := 4 else dx := -4;
+  cx := x1;
+  while abs(x2 - cx) > 6 do
+  begin
+    if (map.land[y1 div 8 - 2]^[cx div 8].land and cwall) > 0 then
+    begin
+      checkLOS := false;
+      exit;
+    end;
+    cx := cx + dx;
+  end;
+
+  // Вертикальная проверка пола/потолка
+  if y1 div 8 <> y2 div 8 then
+  begin
+    if y1 < y2 then dy := 1 else dy := -1;
+    cy := y1 div 8;
+    while cy <> y2 div 8 do
+    begin
+      cy := cy + dy;
+      if (map.land[cy]^[x2 div 8].land and (cwall + cstand)) > 0 then
+      begin
+        checkLOS := false;
+        exit;
+      end;
+    end;
+  end;
 end;
 
 procedure tinfo.clear;
@@ -2521,7 +2558,8 @@ begin
        (map.m^[i].getcx+map.m^[i].getsx*4+s>rx)and
        (map.m^[i].getcx-map.m^[i].getsx*4-s<rx)and
        (map.m^[i].getcy+map.m^[i].getsy*4+s>ry)and
-       (map.m^[i].getcy-map.m^[i].getsy*4-s<ry)
+       (map.m^[i].getcy-map.m^[i].getsy*4-s<ry)and
+       checkLOS(round(rx), round(ry), round(map.m^[i].getcx), round(map.m^[i].getcy))
        then
          map.m^[i].damage(round(map.m^[i].getcx),round(map.m^[i].y-map.m^[i].getsy*6),weapon[nweap].hit*w[nweap],0,0,0,who,0,0);
      end;
@@ -4414,6 +4452,28 @@ begin
           exit;
         end;
       end;
+  end;
+end;
+
+function tmon.check:boolean;
+var
+  i,j,sx,sy,x1,y1,x2,y2:integer;
+begin
+  check:=tobj.check;  // Вызвать базовую проверку
+
+  // При duck и движении вверх - дополнительно проверить полную высоту
+  if (state=duck) and (dy<0) then
+  begin
+    sx:=getsx;
+    sy:=monster[tip].y;  // Полная высота
+    x1:=lx-sx div 2; x2:=x1+sx-1;
+    y2:=ly; y1:=y2-sy+1;
+    if y1<0 then y1:=0;
+    if y2<0 then y2:=0;
+    if (x1<0)or(y1<0)or(x2>=map.x)or(y2>=map.y) then begin upr:=true; check:=true; exit; end;
+    for i:=x1 to x2 do
+      for j:=y1 to y2 do
+      if map.land[j]^[i].land and cwall>0 then begin upr:=true; check:=true; exit; end;
   end;
 end;
 
