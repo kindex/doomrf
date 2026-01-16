@@ -476,6 +476,7 @@ var
   soundCache: array[0..63] of record
     name: string[32];
     chunk: PMix_Chunk;
+    lastFrame: longint;
   end;
   soundCacheCount: integer;
   menuNavSound: string[32];
@@ -507,9 +508,24 @@ begin
     path := 'RF/sfx/' + name + #0;
     soundCache[soundCacheCount].name := name;
     soundCache[soundCacheCount].chunk := Mix_LoadWAV(@path[1]);
+    soundCache[soundCacheCount].lastFrame := -1;
     LoadSound := soundCache[soundCacheCount].chunk;
     inc(soundCacheCount);
   end;
+end;
+
+function CanPlaySound(name: string): boolean;
+var i: integer;
+begin
+  CanPlaySound := true;
+  for i := 0 to soundCacheCount - 1 do
+    if soundCache[i].name = name then begin
+      if soundCache[i].lastFrame = hod then
+        CanPlaySound := false
+      else
+        soundCache[i].lastFrame := hod;
+      exit;
+    end;
 end;
 
 procedure InitSound;
@@ -587,7 +603,7 @@ begin
   { Pick random sound }
   i := random(count);
   chunk := LoadSound(sounds[i]);
-  if chunk <> nil then
+  if (chunk <> nil) and CanPlaySound(sounds[i]) then
     Mix_PlayChannel(-1, chunk, 0);
 end;
 
@@ -612,7 +628,7 @@ begin
   if count = 0 then exit;
   i := random(count);
   chunk := LoadSound(sounds[i]);
-  if chunk <> nil then begin
+  if (chunk <> nil) and CanPlaySound(sounds[i]) then begin
     channel := Mix_PlayChannel(-1, chunk, 0);
     if channel >= 0 then
       Mix_Volume(channel, volume);
@@ -667,7 +683,7 @@ begin
   if count = 0 then exit;
   i := random(count);
   chunk := LoadSound(sounds[i]);
-  if chunk <> nil then begin
+  if (chunk <> nil) and CanPlaySound(sounds[i]) then begin
     channel := Mix_PlayChannel(-1, chunk, 0);
     if (channel >= 0) and (player[1].hero > 0) then begin
       lx := map.m^[player[1].hero].getcx;
