@@ -1,7 +1,7 @@
 {$Ifndef FPC} Turbo Pascal not supported. Only Free Pascal{$endif}
 {$Mode Tp}
 program RF; {First verion: 27.2.2001}
-uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2_mixer;
+uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2,sdl2_mixer;
 const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   game='Doom RF';
   version='2.1';
@@ -477,6 +477,8 @@ var
     name: string[32];
     chunk: PMix_Chunk;
     lastFrame: longint;
+    wadBuffer: pointer;
+    wadSize: longint;
   end;
   soundCacheCount: integer;
   menuNavSound: string[32];
@@ -493,9 +495,62 @@ procedure PlaySoundAt(name: string; sx, sy: real); forward;
 procedure loadmod(a:string); forward;
 (******************************** IMPLEMENTATION ****************************)
 
+{ Convert DOOM sound format to WAV in memory }
+function ConvertDoomSoundToWav(doomData: pointer; doomSize: longint;
+                                var wavData: pointer; var wavSize: longint): boolean;
+var
+  fmt, sampleRate: word;
+  numSamples: longint;
+  p: pbyte;
+begin
+  ConvertDoomSoundToWav := false;
+  if doomSize < 8 then exit;
+
+  { Read DOOM header }
+  fmt := pword(doomData)^;
+  sampleRate := pword(doomData + 2)^;
+  numSamples := plongint(doomData + 4)^;
+
+  if fmt <> 3 then exit;  { Not DOOM format }
+  if numSamples > doomSize - 8 then numSamples := doomSize - 8;
+
+  { Create WAV: 44 byte header + PCM data }
+  wavSize := 44 + numSamples;
+  getmem(wavData, wavSize);
+  p := wavData;
+
+  { RIFF header }
+  move('RIFF', p^, 4); inc(p, 4);
+  plongint(p)^ := wavSize - 8; inc(p, 4);
+  move('WAVE', p^, 4); inc(p, 4);
+
+  { fmt chunk }
+  move('fmt ', p^, 4); inc(p, 4);
+  plongint(p)^ := 16; inc(p, 4);           { chunk size }
+  pword(p)^ := 1; inc(p, 2);               { PCM format }
+  pword(p)^ := 1; inc(p, 2);               { mono }
+  plongint(p)^ := sampleRate; inc(p, 4);   { sample rate }
+  plongint(p)^ := sampleRate; inc(p, 4);   { byte rate }
+  pword(p)^ := 1; inc(p, 2);               { block align }
+  pword(p)^ := 8; inc(p, 2);               { bits per sample }
+
+  { data chunk }
+  move('data', p^, 4); inc(p, 4);
+  plongint(p)^ := numSamples; inc(p, 4);
+  move((doomData + 8)^, p^, numSamples);
+
+  ConvertDoomSoundToWav := true;
+end;
+
 { Sound system implementation }
 function LoadSound(name: string): PMix_Chunk;
-var i: integer; path: string;
+var
+  i: integer;
+  path: string;
+  rw: PSDL_RWops;
+  buf, wavBuf: pointer;
+  size, wavSize: longint;
+  debugFile: file;
 begin
   LoadSound := nil;
   if (not soundEnabled) or (name = '') then exit;
@@ -505,13 +560,71 @@ begin
       exit;
     end;
   if soundCacheCount < 64 then begin
-    path := 'RF/sfx/' + name + #0;
     soundCache[soundCacheCount].name := name;
-    soundCache[soundCacheCount].chunk := Mix_LoadWAV(@path[1]);
+    soundCache[soundCacheCount].wadBuffer := nil;
+    soundCache[soundCacheCount].wadSize := 0;
+
+    { Try WAD first - look for DOOM sound format }
+    buf := nil;
+    if aw.exist(name) then begin
+      aw.assign(name);
+      size := aw.w[aw.cw].cur.l;
+      getmem(buf, size);
+      aw.read(buf^, size);
+
+      writeln('  First 8 bytes (hex): ',
+        hexstr(pbyte(buf)^,2), ' ', hexstr(pbyte(buf+1)^,2), ' ',
+        hexstr(pbyte(buf+2)^,2), ' ', hexstr(pbyte(buf+3)^,2), ' ',
+        hexstr(pbyte(buf+4)^,2), ' ', hexstr(pbyte(buf+5)^,2), ' ',
+        hexstr(pbyte(buf+6)^,2), ' ', hexstr(pbyte(buf+7)^,2));
+
+      { Debug: save raw WAD data to file }
+      system.assign(debugFile, 'debug_sound_raw.bin');
+      system.rewrite(debugFile, 1);
+      system.blockwrite(debugFile, buf^, size);
+      system.close(debugFile);
+      writeln('  Saved raw data to debug_sound_raw.bin');
+
+      { Check if it's DOOM sound format (fmt=3) }
+      if (size >= 8) and (pword(buf)^ = 3) then begin
+        writeln('  DOOM format detected');
+        if ConvertDoomSoundToWav(buf, size, wavBuf, wavSize) then begin
+          freemem(buf, size);
+          buf := nil;
+          rw := SDL_RWFromMem(wavBuf, wavSize);
+          soundCache[soundCacheCount].chunk := Mix_LoadWAV_RW(rw, 1);
+          soundCache[soundCacheCount].wadBuffer := wavBuf;
+          soundCache[soundCacheCount].wadSize := wavSize;
+          writeln('  Converted to WAV, chunk=', ptruint(soundCache[soundCacheCount].chunk));
+        end;
+      end else begin
+        { Maybe it's raw PCM without header - try loading directly }
+        writeln('  Not DOOM format, trying as raw WAV/PCM...');
+        rw := SDL_RWFromMem(buf, size);
+        soundCache[soundCacheCount].chunk := Mix_LoadWAV_RW(rw, 1);
+        if soundCache[soundCacheCount].chunk <> nil then begin
+          soundCache[soundCacheCount].wadBuffer := buf;
+          soundCache[soundCacheCount].wadSize := size;
+          writeln('  Loaded as WAV, chunk=', ptruint(soundCache[soundCacheCount].chunk));
+          buf := nil;  { Don't free - it's used by the chunk }
+        end else begin
+          freemem(buf, size);
+          buf := nil;
+          writeln('  Failed to load from WAD');
+        end;
+      end;
+    end;
+
+    { If WAD loading failed or not found, try filesystem }
+    if soundCache[soundCacheCount].chunk = nil then begin
+      path := runmod + '/sfx/' + name + #0;
+      soundCache[soundCacheCount].chunk := Mix_LoadWAV(@path[1]);
+    end;
+
     soundCache[soundCacheCount].lastFrame := -1;
     LoadSound := soundCache[soundCacheCount].chunk;
     inc(soundCacheCount);
-  end;
+  end else writeln('ERROR: Sound cache overloaded');
 end;
 
 function CanPlaySound(name: string): boolean;
@@ -569,9 +682,12 @@ procedure DoneSound;
 var i: integer;
 begin
   if not soundEnabled then exit;
-  for i := 0 to soundCacheCount - 1 do
+  for i := 0 to soundCacheCount - 1 do begin
     if soundCache[i].chunk <> nil then
       Mix_FreeChunk(soundCache[i].chunk);
+    if soundCache[i].wadBuffer <> nil then
+      freemem(soundCache[i].wadBuffer, soundCache[i].wadSize);
+  end;
   Mix_CloseAudio;
   soundEnabled := false;
 end;
