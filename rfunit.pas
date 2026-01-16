@@ -127,7 +127,7 @@ var
     dest:tdest;
     health,armor,h,stay:longint;
     defitem: tmaxweapon; {?}
-    fish, turret, barrel, fly:boolean;
+    fish, turret, barrel, fly, clever:boolean;
     speed,jumpx,jumpy,acsel,brakes,gun,defangle:real;
     vis:string[32];
     hitSound:string[32];
@@ -324,6 +324,7 @@ begin
       if s1='barrel' then barrel:=boolean(downcase(s2)='true');
       if s1='turret' then turret:=boolean(downcase(s2)='true');
       if s1='fly' then fly:=boolean(downcase(s2)='true');
+      if s1='clever' then clever:=boolean(downcase(s2)='true');
       if s1='turvis' then turvis:=loadasbmp(s2);
       if s1='hitsound' then hitSound:=s2;
       if s1='diesound' then dieSound:=s2;

@@ -778,7 +778,7 @@ begin
 end;
 function tmon.clever: boolean;
 begin
-  clever:=(monster[tip].health>200){or(level.sniper and ai)};
+  clever:=(monster[tip].health>200) or monster[tip].clever;
 end;
 function tmon.onhead(ax,ay: integer):boolean;
 begin
