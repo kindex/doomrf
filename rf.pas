@@ -132,7 +132,7 @@ type
     function en: boolean;
   end;
   tobj=object
-    enable,standing,first,down,elevator,upr:boolean;
+    enable,standing,first,down,elevator,upr,uprX,uprY:boolean;
     lx,ly,mx,my,startx,starty:integer; {map}
     savex,savey:real;
     x,y,dx,dy:real;
@@ -2735,6 +2735,10 @@ begin
   false: begin
     sdx:=dx; ax:=mx;
     tobj.move;
+    { Bounce sound for non-detonating bullets }
+    if (bul[tip].time <> 0) and not bul[tip].walldetonate then
+      if (uprX and (abs(dx) > 1)) or (uprY and (abs(dy) > 1)) then
+        PlaySoundAt(bul[tip].hitSound, x, y);
    if (inwall(cwater)) then
    begin
 //     standing:=true;
@@ -4397,6 +4401,8 @@ begin
     str:=str or boolean(map.land[y2]^[i].land and cstand);
 
   upr:=false;
+  uprX:=false;
+  uprY:=false;
   br:=false;
 
   if typeof(self)=typeof(tmon)then begin
@@ -4470,6 +4476,7 @@ begin
   end
   else begin
     x:=savex;
+    uprX:=true;
     dx:=-dx*getupr;
     dy:=dy*getftr;
     mx:=round(x); lx:=mx div 8;
@@ -4494,6 +4501,7 @@ begin
   end
   else begin
     y:=savey;
+    uprY:=true;
     dy:=dy-getg*speed;
     dy:=-dy*getupr;
     dx:=dx*getftr;
