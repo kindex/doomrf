@@ -1,3 +1,13 @@
+DOOM 513 (2.1)  Date: 2026.01
+Sounds
+Tutorial level
+Fascist clever sniper
+Mods merge RF+Doom
+-------------------------------------------------
+DOOM 513 (2.0)  Date: 2026.01
+SDL
+Linux & Win64 build
+-------------------------------------------------
 DOOM 513 (1.5)  Data: 18.1.2002  Lines: 11099
 Bug Fix: Teleport
 Level total kills, items, time
