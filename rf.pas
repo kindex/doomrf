@@ -5318,7 +5318,7 @@ begin
   fillchar(patname^,256*9,0);
   fillchar(pat,sizeof(pat),0);
  if land[0]=nil then
-  for i:=0 to defy-1 do
+  for i:=0 to defy do
   begin
     getmem(land[i],defx*2);  fillchar(land[i]^,defx*2,0);
   end;
