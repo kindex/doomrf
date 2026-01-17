@@ -294,11 +294,8 @@ var
   actual: longint;
 begin
 //  if curpos+s>l then s:=l-curpos;
-  writeln('tel.read: seek to ', n+curpos, ' read ', s, ' bytes (lump size=', l, ')');
-
   system.seek(f,n+curpos);
   system.blockread(f,p,s,actual);
-  writeln('  blockread actual=', actual);
   inc(curpos,s);
 end;
 procedure twad.close;
