@@ -572,19 +572,6 @@ begin
       getmem(buf, size);
       aw.read(buf^, size);
 
-      writeln('  First 8 bytes (hex): ',
-        hexstr(pbyte(buf)^,2), ' ', hexstr(pbyte(buf+1)^,2), ' ',
-        hexstr(pbyte(buf+2)^,2), ' ', hexstr(pbyte(buf+3)^,2), ' ',
-        hexstr(pbyte(buf+4)^,2), ' ', hexstr(pbyte(buf+5)^,2), ' ',
-        hexstr(pbyte(buf+6)^,2), ' ', hexstr(pbyte(buf+7)^,2));
-
-      { Debug: save raw WAD data to file }
-      system.assign(debugFile, 'debug_sound_raw.bin');
-      system.rewrite(debugFile, 1);
-      system.blockwrite(debugFile, buf^, size);
-      system.close(debugFile);
-      writeln('  Saved raw data to debug_sound_raw.bin');
-
       { Check if it's DOOM sound format (fmt=3) }
       if (size >= 8) and (pword(buf)^ = 3) then begin
         writeln('  DOOM format detected');
@@ -599,13 +586,13 @@ begin
         end;
       end else begin
         { Maybe it's raw PCM without header - try loading directly }
-        writeln('  Not DOOM format, trying as raw WAV/PCM...');
+        // writeln('  Not DOOM format, trying as raw WAV/PCM...');
         rw := SDL_RWFromMem(buf, size);
         soundCache[soundCacheCount].chunk := Mix_LoadWAV_RW(rw, 1);
         if soundCache[soundCacheCount].chunk <> nil then begin
           soundCache[soundCacheCount].wadBuffer := buf;
           soundCache[soundCacheCount].wadSize := size;
-          writeln('  Loaded as WAV, chunk=', ptruint(soundCache[soundCacheCount].chunk));
+          // writeln('  Loaded as WAV, chunk=', ptruint(soundCache[soundCacheCount].chunk));
           buf := nil;  { Don't free - it's used by the chunk }
         end else begin
           freemem(buf, size);
@@ -700,7 +687,6 @@ var
   s: string;
 begin
   if name = '' then exit;
-  if debug then writeln('PlaySound: ', name);
 
   { Parse comma-separated sounds }
   count := 0;
@@ -4789,7 +4775,7 @@ end;
      dy:=dy*0.97;
    end;
 
-   if (gr and cshl>0) then
+   if (map.land[y2]^[lx].land and cshl>0) then
    begin
      standing:=true;
      elevator:=true;
@@ -4802,7 +4788,7 @@ end;
      if inwall(cwall) then begin x:=savex; mx:=round(x); lx:=mx div 8;end;
      br:=true;
    end;
-   if gr and cshr>0 then
+   if map.land[y2]^[lx].land and cshr>0 then
    begin
      standing:=true;
      elevator:=true;
