@@ -628,6 +628,29 @@ begin
     end;
 end;
 
+procedure LoadSoundList(name: string);
+var
+  sounds: array[0..7] of string[32];
+  count, i, p: integer;
+  s: string;
+begin
+  if name = '' then exit;
+
+  count := 0;
+  s := name + ',';
+  while (pos(',', s) > 0) and (count < 8) do begin
+    p := pos(',', s);
+    sounds[count] := copy(s, 1, p - 1);
+    delete(s, 1, p);
+    while (length(sounds[count]) > 0) and (sounds[count][1] = ' ') do
+      delete(sounds[count], 1, 1);
+    if sounds[count] <> '' then inc(count);
+  end;
+
+  for i := 0 to count - 1 do
+    LoadSound(sounds[i]);
+end;
+
 procedure InitSound;
 var i: integer;
 begin
@@ -640,25 +663,25 @@ begin
   soundEnabled := true;
 
   for i := -maxweapon to maxweapon do begin
-    LoadSound(weapon[i].shotSound);
-    LoadSound(weapon[i].pickupSound);
+    LoadSoundList(weapon[i].shotSound);
+    LoadSoundList(weapon[i].pickupSound);
   end;
   for i := 1 to maxmontip do begin
-    LoadSound(monster[i].hitSound);
-    LoadSound(monster[i].dieSound);
-    LoadSound(monster[i].sightSound);
-    LoadSound(monster[i].actSound);
+    LoadSoundList(monster[i].hitSound);
+    LoadSoundList(monster[i].dieSound);
+    LoadSoundList(monster[i].sightSound);
+    LoadSoundList(monster[i].actSound);
   end;
   { Player sounds }
   LoadSound('dsoof.wav');
   LoadSound('dsitmbk.wav');
   LoadSound('dstelept.wav');
   for i := 1 to maxbul do
-    LoadSound(bul[i].hitSound);
+    LoadSoundList(bul[i].hitSound);
   for i := 1 to maxbomb do
-    LoadSound(bomb[i].sound);
+    LoadSoundList(bomb[i].sound);
   for i := 1 to maxit do
-    LoadSound(it[i].pickupSound);
+    LoadSoundList(it[i].pickupSound);
   { Menu sounds }
   LoadSound(menuNavSound);
   LoadSound(menuSelectSound);
