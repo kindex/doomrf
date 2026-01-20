@@ -707,6 +707,7 @@ if ioresult<>0 then exit;
   blue:=getcolor(0,0,255);
   grey:=getcolor(200,200,200);
   dark:=getcolor(100,100,100);
+  orange:=getcolor(255,128,0);
 end;
 (*function tspr.loadfile(s:string):boolean;
 const
