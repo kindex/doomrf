@@ -4010,6 +4010,7 @@ begin
         wb.print(100,50,'Загрузить');
         s:=getlevel{enterfile(map.name)}('Загрузить');
         if s<>'' then map.load(s);
+        repeat sdlinput.PollEvents until not sdlinput.push;
       end;
     4: begin
          wb.print(100,50,'Новая игра');
@@ -4782,6 +4783,8 @@ end;
 //     dy:=-dy*getupr;
 //     y:=y-28*speed/mfps;
      x:=x-28*speed/mfps;
+     if (map.land[y2]^[lx].land and cstand>0) then
+       y:=y-28*speed/mfps;
      dx:=dx*0.95;
 //     dx:=-1;
      mx:=round(x); lx:=mx div 8;
@@ -4794,6 +4797,8 @@ end;
      elevator:=true;
 //     dy:=-dy*getupr;
      x:=x+28*speed/mfps;
+     if (map.land[y2]^[lx].land and cstand>0) then
+       y:=y-28*speed/mfps;
      dx:=dx*0.95;
 //     y:=y-1;
 //     x:=x+1;
@@ -6139,7 +6144,8 @@ begin
        end;
     5: begin loadgame(getsave('Load')); if loaded then break; end;
     6: begin level.cheater:=false;
-        winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;end;
+        winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;
+        repeat sdlinput.PollEvents until not sdlinput.push; end;
     0,7: begin endgame:=true; first:=true;end;
    end;
  until level.first;
