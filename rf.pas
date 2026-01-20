@@ -187,7 +187,7 @@ type
      dest: tdest;
      tip: tmaxmontip;
      vis,hero,longjumpn,jumpfr,statedel,savedel :longint;
-     armorhit,armorbomb,armoroxy,armorfreez,qdamage,god,delay,freez,fired,deldam : ttime;
+     armorhit,armorbomb,armoroxy,armorfreez,qdamage,god,delay,freez,fired,deldam,pain : ttime;
      state,curstate:tstate;
      health,armor,buhalo,vempire,oxy,oxylife,g,usk,longjump:real;
      weap: longint{tmaxweapon};
@@ -3366,8 +3366,10 @@ begin
     map.randompix(ax,ay,dx+adx,dy+ady,5,5,blow);
 
   { Play hit sound if damage was dealt and monster is still alive }
-  if (hit+bomb > 0) and (health > 0) then
+  if (hit+bomb > 0) and (health > 0) then begin
     PlaySoundAt(monster[tip].hitSound, getcx, getcy);
+    if ai then pain.init((1 + hit + bomb) * 0.015);  { Pain state: no move/shoot }
+  end;
 
   if (health<=0)and l then
     if (bomb>0)or(freez.en) then begin explode(dwho); freez.clear; end
@@ -3437,6 +3439,9 @@ begin
 begin
 
   if life then begin
+  { Pain state: can't move or shoot }
+  if ai and pain.en then key := [];
+
   if kdown in key then
   begin
     if inwater or ((getg=0)and not standing)then dy:={dy+}monster[tip].jumpy*0.5*usk
@@ -3783,6 +3788,7 @@ begin
     if see and not sawPlayer then begin
       sawPlayer := true;
       PlaySoundAt(monster[tip].sightSound, getcx, getcy);
+      setdelay(0.2);  { Delay before first shot after seeing player }
     end;
     if not see then sawPlayer := false;
 
@@ -5039,7 +5045,7 @@ begin
   hero:=ah;
   fillchar(w,sizeof(w),0); // No weapons
   weap:=0;
-  delay.clear; deldam.clear; oxy:=100; oxylife:=0;
+  delay.clear; deldam.clear; pain.clear; oxy:=100; oxylife:=0;
   ai:=aai;
   who:=aw;
   lastwho:=-1;
