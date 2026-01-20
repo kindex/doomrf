@@ -263,7 +263,9 @@ type
   end;
   tF=object(tobj)
     tip,sx,sy: integer;
+    idx: integer;
     dest: tdest;
+    delay: ttime;
     procedure init(ax,ay,asx,asy,at,an:integer);
     procedure move; virtual;
     procedure draw(ax,ay,id:integer);
@@ -1848,9 +1850,107 @@ function tplayer.getherotip:integer;
 begin
   if deftip=0 then getherotip:=1 else getherotip:=deftip;
 end;
-procedure tf.move;
+function SpawnBlocked(ax, ay, asx, asy: integer): boolean;
+var
+  j: integer;
+  mx1, my1, mx2, my2: integer;  { new mob bounds }
+  ox1, oy1, ox2, oy2: integer;  { other mob bounds }
 begin
- {error nothing?}
+  SpawnBlocked := false;
+  { New mob bounding box - size is in cells, *4 = half width, *8 = full height }
+  mx1 := ax - asx * 4;
+  mx2 := ax + asx * 4;
+  my1 := ay - asy * 8;
+  my2 := ay;
+
+  for j := 0 to maxmon do
+    if map.m^[j].enable and map.m^[j].life then
+    begin
+      { Other mob bounding box }
+      ox1 := map.m^[j].mx - map.m^[j].getsx * 4;
+      ox2 := map.m^[j].mx + map.m^[j].getsx * 4;
+      oy1 := map.m^[j].my - map.m^[j].getsy * 8;
+      oy2 := map.m^[j].my;
+
+      { Check overlap }
+      if (mx1 < ox2) and (mx2 > ox1) and (my1 < oy2) and (my2 > oy1) then
+      begin
+        writeln('SWAPN BLOCKED by mon[', j, '] box: x=', ox1, '..', ox2, ' y=', oy1, '..', oy2);
+        SpawnBlocked := true;
+        exit;
+      end;
+    end;
+end;
+
+procedure tf.move;
+var
+  i, ti: integer;
+  scx, scy, tcx, tcy: real;  { Spawn/Target center }
+  offx, offy: real;          { offset from Spawn center }
+  nx, ny: real;              { new position in Target }
+  found: boolean;
+begin
+  if tip = 29 then  { Spawn }
+  begin
+    if delay.ready then
+    begin
+      { Find next Target (tip=14) after this Spawn }
+      ti := -1;
+      for i := idx + 1 to maxf do
+        if map.f^[i].enable and (map.f^[i].tip = 14) then
+        begin
+          ti := i;
+          break;
+        end;
+
+      if ti >= 0 then
+      begin
+        { Spawn center }
+        scx := x + getsx / 2;
+        scy := y + getsy / 2;
+        { Target center }
+        tcx := map.f^[ti].x + map.f^[ti].getsx / 2;
+        tcy := map.f^[ti].y + map.f^[ti].getsy / 2;
+
+        { Find mobs inside Spawn region, spawn them at Target with same offset }
+        found := false;
+        for i := 0 to maxmon do
+          if map.m^[i].enable then
+          begin
+            if (map.m^[i].mx >= x) and (map.m^[i].mx <= x + getsx) and
+               (map.m^[i].my >= y) and (map.m^[i].my <= y + getsy) then
+            begin
+              found := true;
+              { Calculate offset from Spawn center }
+              offx := map.m^[i].x - scx;
+              offy := map.m^[i].y - scy;
+              { New position = Target center + offset }
+              nx := tcx + offx;
+              ny := tcy + offy;
+
+              { Check if there's free space at target position (no wall, no mob) }
+              if map.space(round(nx), round(ny)) and
+                 not SpawnBlocked(round(nx), round(ny), monster[map.m^[i].tip].x, monster[map.m^[i].tip].y) then
+              begin
+                writeln('  -> SPAWN mon tip=', map.m^[i].tip, ' offset=', offx:0:0, ',', offy:0:0, ' -> ', nx:0:0, ',', ny:0:0);
+                map.initmon(nx, ny, map.m^[i].tip, map.m^[i].dest, true, true, 0);
+                PlaySoundAt('dsbospn.wav', nx, ny);
+                map.initbomb(round(nx), round(ny) - 16, reswapbomb, -1);
+              end
+              else
+                writeln('  -> BLOCKED: no space at ', nx:0:0, ',', ny:0:0);
+            end;
+          end;
+
+        if not found then
+          writeln('SPAWN: no monsters in Spawn region');
+      end
+      else
+        writeln('SPAWN: no Target found');
+
+      delay.init(10);
+    end;
+  end;
 end;
 function tf.getsx:integer;
 begin getsx:=sx; end;
@@ -1867,6 +1967,7 @@ begin
   if sx<0 then begin x:=x+sx; sx:=-sx; end;
   if sy<0 then begin y:=y+sy; sy:=-sy; end;
   tip:=at;
+  idx:=an;
   mx:=round(x);
   my:=round(y);
 
@@ -1879,6 +1980,9 @@ begin
     sx:=map.f^[an-1].sx;
     sy:=map.f^[an-1].sy;
   end;
+
+  delay.clear;
+  if tip = 29 then delay.init(10);  { Spawn: first spawn after 10 sec }
 end;
 function tmon.takegod(n:real):boolean;
 begin
