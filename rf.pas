@@ -4219,9 +4219,9 @@ begin
      end;
      face,fillface: with land do
       begin
-        if mx>=(getmaxx-4) then inc(ch,8)
+        if mx>=(getmaxx-4) then begin inc(ch,8); repeat sdlinput.PollEvents until not sdlinput.push; end
           else
-        if (mx<=4)and(ch>0) then  dec(ch,8)
+        if (mx<=4)and(ch>0) then begin dec(ch,8); repeat sdlinput.PollEvents until not sdlinput.push; end
           else
         for i:=1 to maxtt do if mo(t[i].x-1,t[i].y-1,t[i].x+p[t[i].b].x,t[i].y+p[t[i].b].y) then
         begin
