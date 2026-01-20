@@ -37,6 +37,7 @@ var
   blue: color = 1;
   green: color = 2;
   yellow: color = 14;
+  orange: color = 6;
   fon: color = 0;
   palLoaded: boolean = false;
 
@@ -206,6 +207,7 @@ begin
   grey := getcolor(200, 200, 200);
   dark := getcolor(100, 100, 100);
   yellow := getcolor(255, 255, 0);
+  orange := getcolor(255, 128, 0);
 end;
 
 procedure setpal;
@@ -249,6 +251,7 @@ begin
   grey := getcolor(200, 200, 200);
   dark := getcolor(100, 100, 100);
   yellow := getcolor(255, 255, 0);
+  orange := getcolor(255, 128, 0);
 end;
 
 procedure setmode(const ax, ay: xy);

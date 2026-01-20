@@ -4075,6 +4075,14 @@ begin
        i:=(my-scry)div 10;
        if mx>100 then inc(i,4);
        land.mask:=land.mask xor (1 shl (i-1));
+       // Взаимоисключение cwater и clava
+       if (land.mask and cwater>0) and (land.mask and clava>0) then
+         if (1 shl (i-1))=cwater then land.mask:=land.mask and not clava
+         else if (1 shl (i-1))=clava then land.mask:=land.mask and not cwater;
+       // Взаимоисключение cshl и cshr
+       if (land.mask and cshl>0) and (land.mask and cshr>0) then
+         if (1 shl (i-1))=cshl then land.mask:=land.mask and not cshr
+         else if (1 shl (i-1))=cshr then land.mask:=land.mask and not cshl;
      end;
      face,fillface: with land do
       begin
@@ -5429,18 +5437,8 @@ end;
 procedure tmap.drawhidden; {40x25}
 var i,j:longint;
     x1,y1,x2,y2:integer;
-function getcol(a:byte):byte;
-begin
-  getcol:=0;
-  if a and cwall>0 then getcol:=white;
-  if a and cstand>0 then getcol:=green;
-  if a and clava>0 then getcol:=red;
-  if a and cwater>0 then getcol:=blue;
-  if a and cshl>0 then getcol:=grey;
-  if a and cshr>0 then getcol:=dark;
-  if a and cFunc>0 then getcol:=blue;
-  if a and cDeath>0 then getcol:=red;
-end;
+    px,py:integer;
+    l:byte;
 begin
   x1:=dx div 8;
   y1:=dy div 8;
@@ -5450,8 +5448,46 @@ begin
     for j:=0 to scry div 8 do
     if (j+y1<y)and(i+x1<x)then
     if (j+y1>=0)and(i+x1>=0)then
-     if land[j+y1]^[i+x1].land<>0 then
-       rectangle2(i*8+1-x2,j*8+1-y2,i*8+6-x2,j*8+6-y2,getcol(land[j+y1]^[i+x1].land));
+    begin
+      l:=land[j+y1]^[i+x1].land;
+      if l<>0 then
+      begin
+        px:=i*8-x2;
+        py:=j*8-y2;
+        // cwall - внешняя рамка
+        if l and cwall>0 then
+          rectangle2(px+1,py+1,px+6,py+6,white);
+        // cstand - горизонтальная линия (-)
+        if l and cstand>0 then
+          line(px+1,py+4,px+6,py+4,green);
+        // cwater/clava - внутренняя рамка (на 2px меньше)
+        if l and cwater>0 then
+          rectangle2(px+3,py+3,px+4,py+4,blue);
+        if l and clava>0 then
+          rectangle2(px+3,py+3,px+4,py+4,red);
+        // cshl - символ < на всю клетку (оранжевый)
+        if l and cshl>0 then begin
+          line(px+5,py+1,px+1,py+4,orange);
+          line(px+1,py+4,px+5,py+7,orange);
+        end;
+        // cshr - символ > на всю клетку (оранжевый)
+        if l and cshr>0 then begin
+          line(px+2,py+1,px+6,py+4,orange);
+          line(px+6,py+4,px+2,py+7,orange);
+        end;
+        // cDeath - символ X на всю клетку
+        if l and cDeath>0 then begin
+          line(px+1,py+1,px+6,py+6,red);
+          line(px+6,py+1,px+1,py+6,red);
+        end;
+        // cFunc - символ F на всю клетку
+        if l and cFunc>0 then begin
+          line(px+1,py+1,px+1,py+6,blue);
+          line(px+1,py+1,px+6,py+1,blue);
+          line(px+1,py+3,px+5,py+3,blue);
+        end;
+      end;
+    end;
 end;
 procedure tmap.drawnodes;
 var i:integer;
