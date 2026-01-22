@@ -68,11 +68,11 @@ const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   ('Стена',  'Ступень',  'Вода',  'Лава',  '<< /Over',  '>> /Over',  'Function',  'Deathmatch');
 {  ednodestr:array[1..4]of string[16]=
   ( 'Цель-Выход',  'Важный',  'Предмет',  '-'  );}
-  maxedmenu=12+5+4+1+2+1;
+  maxedmenu=12+5+4+1+2+1+1;
   edmenustr:array[1..maxedmenu]of string[16]=
-  ('Выход',  'Сохранить',  'Загрузить',  'Новая',  'Текстуры',  'Стены',
-   'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',  '(C)',
-   'Оружие','Патроны','Аптечки','Интерьер','Колонны',
+  ('Выход',  'Новая',  'Загрузить',  'Сохранить',  'Играть',  'Текстуры',
+   'Стены',  'Монстры',  'Предметы',  'Функции',  'Скрытые',  'Пути',
+   '(C)',  'Оружие','Патроны','Аптечки','Интерьер','Колонны',
    '','Пусто','Стена','Ступень','Обои','Текстуры+','Стены+','Сообщения');
 type
   real=single;
@@ -416,7 +416,7 @@ type
     max,cur:integer;
     name:array[0..40]of string[8];
     skill: longint;
-    editor,endgame,multi,death,first,rail,look,sniper,reswap,started,cheater,training:boolean;
+    editor,endgame,multi,death,first,rail,look,sniper,reswap,started,cheater,training,quickplay:boolean;
     maxpl:integer;
     start,curtime: longint;
     alltime: longint;
@@ -495,6 +495,7 @@ procedure PlaySoundVolume(name: string; volume: byte); forward;
 procedure PlaySoundAt(name: string; sx, sy: real); forward;
 
 procedure loadmod(a:string); forward;
+procedure normskill(s:integer); forward;
 (******************************** IMPLEMENTATION ****************************)
 
 { Convert DOOM sound format to WAV in memory }
@@ -4128,24 +4129,8 @@ begin
   begin
     cured:=my div 10+1;
     case cured of
-   1:
-   begin
-{     s:='yes';
-     readline(100,100,s,s,white,0);
-     if downcase(s)='yes'then }level.endgame:=true;
-   end;
-   2: begin
-        wb.print(100,50,'Сохранить');
-        s:=enterfile(map.name);
-        if s<>'' then begin map.name:=s; map.save; end;
-      end;
-   3: begin
-        wb.print(100,50,'Загрузить');
-        s:=getlevel{enterfile(map.name)}('Загрузить');
-        if s<>'' then map.load(s);
-        repeat sdlinput.PollEvents until not sdlinput.push;
-      end;
-    4: begin
+    1: level.endgame:=true;  // Выход
+    2: begin  // Новая
          wb.print(100,50,'Новая игра');
          s:='yes';
          readline(100,100,s,s,white,0);
@@ -4160,33 +4145,57 @@ begin
            map.initnode(32,32,nodes.mask);
          end;
        end;
-    5: begin scry:=getmaxy-50; what:=face;  reload; end;
-    6:  begin scry:=getmaxy-50; what:=wall; end;
-    7:  begin scry:=getmaxy-50; what:=mons; end;
-    8:  begin scry:=getmaxy-50; what:=items;end;
-    9:  begin scry:=getmaxy-50; what:=func; end;
-    10: begin cool:=not cool; repeat sdlinput.PollEvents until not sdlinput.push; end;
-    11: begin scry:=getmaxy; what:=node; end;
-    12:begin
-         wb.print(100,50,'Комментарии');
-{         readline(1,100,map.copy,map.copy,white,0);}
-         readline(1,100,map.com,map.com,white,0);
+    3: begin  // Загрузить
+         wb.print(100,50,'Загрузить');
+         s:=getlevel('Загрузить');
+         if s<>'' then map.load(s);
+         repeat sdlinput.PollEvents until not sdlinput.push;
        end;
-    13: begin scry:=getmaxy-50;what:=items; itm.shift:=1; end;
-    14: begin scry:=getmaxy-50;what:=items; itm.shift:=21; end;
-    15: begin scry:=getmaxy-50;what:=items; itm.shift:=40; end;
-    16: begin scry:=getmaxy-50;what:=items; itm.shift:=58; end;
-    17: begin scry:=getmaxy-50;what:=items; itm.shift:=80; end;
-    19: land.mask:=0;
-    20: land.mask:=cwall;
-    21: land.mask:=cstand;
-    22: {Wallpapers} begin
-        wb.print(100,50,'Обои');
-        map.wallpaper:=enterwall(map.wallpaper);
-    end;
-    23: begin scry:=getmaxy-50; what:=fillface;  reload; end;
-    24: begin scry:=getmaxy-50; what:=fillwall; end;
-    25: begin scry:=getmaxy; what:=mes; end;
+    4: begin  // Сохранить
+         wb.print(100,50,'Сохранить');
+         s:=enterfile(map.name);
+         if s<>'' then begin map.name:=s; map.save; end;
+       end;
+    5: begin  // Играть (Save & Play)
+         map.save;
+         level.name[1]:=map.name;
+         level.max:=1;
+         level.cur:=0;
+         level.first:=true;
+         level.editor:=false;
+         level.multi:=false;
+         level.death:=false;
+         level.cheater:=false;
+         normskill(3);
+         level.quickplay:=true;
+         level.endgame:=true;
+       end;
+    6: begin scry:=getmaxy-50; what:=face; reload; end;  // Текстуры
+    7: begin scry:=getmaxy-50; what:=wall; end;  // Стены
+    8: begin scry:=getmaxy-50; what:=mons; end;  // Монстры
+    9: begin scry:=getmaxy-50; what:=items; end;  // Предметы
+    10: begin scry:=getmaxy-50; what:=func; end;  // Функции
+    11: begin cool:=not cool; repeat sdlinput.PollEvents until not sdlinput.push; end;  // Скрытые
+    12: begin scry:=getmaxy; what:=node; end;  // Пути
+    13: begin  // (C)
+          wb.print(100,50,'Комментарии');
+          readline(1,100,map.com,map.com,white,0);
+        end;
+    14: begin scry:=getmaxy-50; what:=items; itm.shift:=1; end;  // Оружие
+    15: begin scry:=getmaxy-50; what:=items; itm.shift:=21; end;  // Патроны
+    16: begin scry:=getmaxy-50; what:=items; itm.shift:=40; end;  // Аптечки
+    17: begin scry:=getmaxy-50; what:=items; itm.shift:=58; end;  // Интерьер
+    18: begin scry:=getmaxy-50; what:=items; itm.shift:=80; end;  // Колонны
+    20: land.mask:=0;  // Пусто
+    21: land.mask:=cwall;  // Стена
+    22: land.mask:=cstand;  // Ступень
+    23: begin  // Обои
+          wb.print(100,50,'Обои');
+          map.wallpaper:=enterwall(map.wallpaper);
+        end;
+    24: begin scry:=getmaxy-50; what:=fillface; reload; end;  // Текстуры+
+    25: begin scry:=getmaxy-50; what:=fillwall; end;  // Стены+
+    26: begin scry:=getmaxy; what:=mes; end;  // Сообщения
   end;
  end;
 
@@ -6231,6 +6240,12 @@ var
   s:string;
   t: integer;
 begin
+ if level.quickplay then begin
+   level.quickplay:=false;
+   level.endgame:=false;
+   loaded:=false;
+   exit;
+ end;
  loaded:=false;
  repeat
    level.first:=false;
@@ -6661,9 +6676,11 @@ begin
           rtimer.clear;
         end else
         begin
-          gamemenu;
-          time.clear;
-          rtimer.clear;
+          if not level.quickplay then begin
+            gamemenu;
+            time.clear;
+            rtimer.clear;
+          end;
         end;
       end;
       false:
@@ -6690,9 +6707,11 @@ begin
           rtimer.clear;
         end else
         begin
-          gamemenu;
-          time.clear;
-          rtimer.clear;
+          if not level.quickplay then begin
+            gamemenu;
+            time.clear;
+            rtimer.clear;
+          end;
         end;
       end;
     end;
@@ -6844,6 +6863,7 @@ begin
 
   mfps:=30;
   level.first:=true;
+  level.quickplay:=false;
   map.newObj;
 
  repeat
