@@ -2020,27 +2020,35 @@ begin
 end;
 
 function tmon.takehealth(n:real):boolean;
+var
+  maxhp: real;
 begin
-  if health>=getmaxhealth then begin takehealth:=false; exit; end;
+  maxhp:=getmaxhealth;
+  if (health>=maxhp) and (not fired.en) then begin takehealth:=false; exit; end;
 
-  if not level.multi and (hero>0) then
-    info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
-
-  health:=health+n;
+  if health<maxhp then begin
+    if not level.multi and (hero>0) then
+      info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
+    health:=health+n;
+    if health>maxhp then health:=maxhp;
+  end;
   fired.clear;
-  if health>getmaxhealth then health:=getmaxhealth;
   takehealth:=true;
 end;
 function tmon.takemegahealth(n:real):boolean;
+var
+  maxhp: real;
 begin
-  if health>=getmaxhealth*2 then begin takemegahealth:=false; exit; end;
-  health:=health+n;
+  maxhp:=getmaxhealth*2;
+  if (health>=maxhp) and (not fired.en) then begin takemegahealth:=false; exit; end;
 
-  if not level.multi and (hero>0) then
-    info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
-
+  if health<maxhp then begin
+    if not level.multi and (hero>0) then
+      info.add('Вы взяли '+st(round(n))+' здоровья',green,5);
+    health:=health+n;
+    if health>maxhp then health:=maxhp;
+  end;
   fired.clear;
-  if health>getmaxhealth*2 then health:=getmaxhealth*2;
   takemegahealth:=true;
 end;
 
