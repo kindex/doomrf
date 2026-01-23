@@ -4040,7 +4040,7 @@ begin
      begin
        if shift+i=cur then bar(i*ddd,scry+12,(i+1)*ddd-1,getmaxx,white);
        print(i*ddd,scry+2,not white,monster[shift+i].name);
-       p[monster[shift+i].stand[right]].spriteTranslated(i*ddd,scry+12,monster[shift+i].colormap);
+       p[monster[shift+i].stand[right]].spriteTranslated(i*ddd,scry+12,monster[shift+i].colormap,monster[shift+i].sourcecolormap);
      end;
    end;
    items:
@@ -4994,17 +4994,17 @@ begin
   if monster[tip].turret then if life then state:=stand else state:=die;
 
   case state of
-   stand:p[monster[tip].stand[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   run:  p[monster[tip].run[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   fire: p[monster[tip].fire[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   hack: p[monster[tip].damage[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   die:  p[monster[tip].die[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   crash:p[monster[tip].bomb[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
-   hai:  p[monster[tip].hai[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   stand:p[monster[tip].stand[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   run:  p[monster[tip].run[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   fire: p[monster[tip].fire[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   hack: p[monster[tip].damage[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   die:  p[monster[tip].die[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   crash:p[monster[tip].bomb[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
+   hai:  p[monster[tip].hai[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
    duck:
    p[monster[tip].duck[
    norm(1,monster[tip].ducki.max,(mx div round(monster[tip].ducki.delay+1) mod monster[tip].ducki.max)+1),
-   dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap,monster[tip].sourcecolormap);
   end;
   if monster[tip].turret {and life }then begin
     // putrot not implemented in SDL2, use static turret sprite

@@ -6,15 +6,16 @@ const
   maxpat=2048;
   dotbmp:string[4]='.bmp';
   { Color translation ranges (Doom palette) }
-  { Order: 112, 176, 192, 64, 32, 96, 128 }
+  { Order: 112, 176, 208, 64, 32, 96, 128 }
   GREEN_START = 112;   { 0 - green (original) }
   GREEN_END = 127;
   COLOR1_START = 176;  { 1 - red }
-  COLOR2_START = 192;  { 2 - orange }
+  COLOR2_START = 208;  { 2 - orange }
   COLOR3_START = 64;   { 3 - brown }
   COLOR4_START = 32;   { 4 - light tan }
   COLOR5_START = 96;   { 5 - indigo }
   COLOR6_START = 128;  { 6 - dark }
+  colorStarts: array[0..6] of integer = (112, 176, 192, 64, 32, 96, 128);
 type
   tnpat=0..maxpat;
   filename=string[32];
@@ -94,8 +95,8 @@ type
 
     procedure spritergb(ax,ay:xy; r,g,b: byte);
 
-    procedure spriteTranslated(ax,ay:xy; colormap: byte);
-    procedure spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap: byte);
+    procedure spriteTranslated(ax,ay:xy; colormap, sourcecolormap: byte);
+    procedure spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap, sourcecolormap: byte);
 
     function loadr(a:string):boolean;
   end;
@@ -781,15 +782,19 @@ begin
   colorTransInit := true;
 end;
 
-procedure tspr.spriteTranslated(ax,ay:xy; colormap: byte);
+procedure tspr.spriteTranslated(ax,ay:xy; colormap, sourcecolormap: byte);
 var
   i,j,ss,sx,sy,l,origL: longint;
   translated: array[0..1024] of byte;
   srcPtr: ^byte;
+  sourceStart, targetStart: integer;
+  pixel: byte;
 begin
-  if colormap = 0 then begin sprite(ax,ay); exit; end;
-  if not colorTransInit then InitColorTranslations;
+  if (colormap = sourcecolormap) then begin sprite(ax,ay); exit; end;
   if tag=ibmp then begin tbmp.put(ax,ay); exit; end;
+
+  sourceStart := colorStarts[sourcecolormap];
+  targetStart := colorStarts[colormap];
 
   ss:=0;
   for i:=1 to sprlines do begin
@@ -802,8 +807,13 @@ begin
     srcPtr := @spr^[ss+3];
 
     { Copy and translate colors }
-    for j:=0 to origL-1 do
-      translated[j] := colorTrans[colormap, srcPtr[j]];
+    for j:=0 to origL-1 do begin
+      pixel := srcPtr[j];
+      if (pixel >= sourceStart) and (pixel <= sourceStart + 15) then
+        translated[j] := targetStart + (pixel - sourceStart)
+      else
+        translated[j] := pixel;
+    end;
 
     sdlgraph.sprite(translated,ax+sx,ay+sy,origL);
     {$ifndef high}
@@ -814,11 +824,11 @@ begin
   end;
 end;
 
-procedure tspr.spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap: byte);
+procedure tspr.spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap, sourcecolormap: byte);
 begin
   { For now, just use spriteTranslated - can add outline/rgb later if needed }
-  if colormap = 0 then begin spriteo(ax,ay,c,r,g,b); exit; end;
-  spriteTranslated(ax-x div 2, ay-y, colormap);
+  if colormap = sourcecolormap then begin spriteo(ax,ay,c,r,g,b); exit; end;
+  spriteTranslated(ax-x div 2, ay-y, colormap, sourcecolormap);
 end;
 
 begin
