@@ -1,7 +1,7 @@
 {$Ifndef FPC} Turbo Pascal not supported. Only Free Pascal{$endif}
 {$Mode Tp}
 program RF; {First verion: 27.2.2001}
-uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2,sdl2_mixer;
+uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2,sdl2_mixer,keyconfig;
 const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   game='Doom RF';
   version='2.1';
@@ -6057,6 +6057,241 @@ begin
    5: begin reswap:=true; reswaptime:=90; monswaptime:=60;  rail:=true;  look:=true; sniper:=true; end;
   end;
 end;
+
+{ ============ Key Configuration Menu ============ }
+procedure PlayerKeyMenu(playerNum: integer);
+var
+  ch, i: integer;
+  newKey: byte;
+  profileName: string;
+
+  procedure DrawPlayerMenu;
+  var
+    j, y, sx, sy: integer;
+    s: string;
+  begin
+    clear;
+    sx:=(getmaxx-p[intro].x) div 2;
+    sy:=(getmaxy-p[intro].y) div 2;
+    p[intro].put(sx,sy);
+
+    { Title }
+    wb.print(80, 30, 'Игрок ' + st(playerNum));
+
+    { Profile status }
+    if keyconfig.UseCustomKeys[playerNum] then
+      profileName := 'Свои'
+    else
+      profileName := keyconfig.ProfileNames[playerNum];
+    rb.print(80, 55, 'Профиль - ' + profileName);
+
+    { Key list }
+    y := 80;
+    for j := 1 to KC_MAXKEY do
+    begin
+      s := keyconfig.KeyActionNames[j] + ' - ' + keyconfig.KeyCodeToName(keyconfig.GetPlayerKey(playerNum, j));
+      if j = ch then
+        wb.print(80, y, s)
+      else
+        rb.print(80, y, s);
+      inc(y, 18);
+    end;
+
+    { Additional options }
+    y := y + 10;
+    if ch = KC_MAXKEY + 1 then
+      wb.print(80, y, 'Сбросить')
+    else
+      rb.print(80, y, 'Сбросить');
+    inc(y, 18);
+    if ch = KC_MAXKEY + 2 then
+      wb.print(80, y, 'Назад')
+    else
+      rb.print(80, y, 'Назад');
+
+    rb.print(50, getmaxy - 25, 'Enter - изменить, Esc - назад');
+    screen;
+  end;
+
+  procedure ChangePlayerKey(keyIndex: integer);
+  var sx, sy: integer;
+  begin
+    clear;
+    sx:=(getmaxx-p[intro].x) div 2;
+    sy:=(getmaxy-p[intro].y) div 2;
+    p[intro].put(sx,sy);
+    wb.print(80, 100, 'Нажмите клавишу для ');
+    wb.print(80, 130, keyconfig.KeyActionNames[keyIndex]);
+    rb.print(80, 170, ' Esc для отмены');
+    screen;
+
+    newKey := keyconfig.WaitForKey;
+    if newKey > 0 then
+    begin
+      keyconfig.UseCustomKeys[playerNum] := true;
+      keyconfig.UserKeys[playerNum][keyIndex] := newKey;
+    end;
+  end;
+
+begin
+  ch := 1;
+  repeat
+    DrawPlayerMenu;
+    PollEvents;
+    if quit_requested then break;
+    if keypressed then
+    case readkey of
+      #13: begin
+             if ch <= KC_MAXKEY then
+               ChangePlayerKey(ch)
+             else if ch = KC_MAXKEY + 1 then
+             begin
+               { Reset to default }
+               keyconfig.UseCustomKeys[playerNum] := false;
+               for i := 1 to KC_MAXKEY do
+                 keyconfig.UserKeys[playerNum][i] := keyconfig.DefaultKeys[playerNum][i];
+             end
+             else if ch = KC_MAXKEY + 2 then
+               break;
+           end;
+      #27: break;
+      #0: case readkey of
+            #80: if ch < KC_MAXKEY + 2 then inc(ch);
+            #72: if ch > 1 then dec(ch);
+          end;
+    end;
+  until false;
+end;
+
+procedure ExtraKeyMenu;
+var
+  ch, i: integer;
+  newKey: byte;
+
+  procedure DrawExtraMenu;
+  var
+    j, y, sx, sy: integer;
+    s: string;
+  begin
+    clear;
+    sx:=(getmaxx-p[intro].x) div 2;
+    sy:=(getmaxy-p[intro].y) div 2;
+    p[intro].put(sx,sy);
+
+    wb.print(80, 20, 'Дополнительные клавиши');
+
+    if keyconfig.UseCustomExtra then
+      rb.print(80, 42, 'Профиль - Свои')
+    else
+      rb.print(80, 42, 'Профиль - Стандарт');
+
+    y := 62;
+    for j := 1 to KC_MAXEXTRA do
+    begin
+      s := keyconfig.ExtraActionNames[j] + ' - ' + keyconfig.KeyCodeToName(keyconfig.GetExtraKey(j));
+      if j = ch then
+        wb.print(70, y, s)
+      else
+        rb.print(70, y, s);
+      inc(y, 14);
+    end;
+
+    y := y + 8;
+    if ch = KC_MAXEXTRA + 1 then
+      wb.print(70, y, 'Сбросить')
+    else
+      rb.print(70, y, 'Сбросить');
+    inc(y, 14);
+    if ch = KC_MAXEXTRA + 2 then
+      wb.print(70, y, '>Назад')
+    else
+      rb.print(70, y, ' Назад');
+
+    rb.print(50, getmaxy - 25, 'Enter - изменить, Esc - назад');
+    screen;
+  end;
+
+  procedure ChangeExtraKey(keyIndex: integer);
+  var sx, sy: integer;
+  begin
+    clear;
+    sx:=(getmaxx-p[intro].x) div 2;
+    sy:=(getmaxy-p[intro].y) div 2;
+    p[intro].put(sx,sy);
+    wb.print(80, 100, 'Нажмите клавишу для:');
+    wb.print(80, 130, keyconfig.ExtraActionNames[keyIndex]);
+    rb.print(80, 170, '(Esc для отмены)');
+    screen;
+
+    newKey := keyconfig.WaitForKey;
+    if newKey > 0 then
+    begin
+      keyconfig.UseCustomExtra := true;
+      keyconfig.ExtraKeys[keyIndex] := newKey;
+    end;
+  end;
+
+begin
+  ch := 1;
+  repeat
+    DrawExtraMenu;
+    PollEvents;
+    if quit_requested then break;
+    if keypressed then
+    case readkey of
+      #13: begin
+             if ch <= KC_MAXEXTRA then
+               ChangeExtraKey(ch)
+             else if ch = KC_MAXEXTRA + 1 then
+             begin
+               { Reset to default }
+               keyconfig.UseCustomExtra := false;
+               keyconfig.ExtraKeys := keyconfig.DefaultExtra;
+             end
+             else if ch = KC_MAXEXTRA + 2 then
+               break;
+           end;
+      #27: break;
+      #0: case readkey of
+            #80: if ch < KC_MAXEXTRA + 2 then inc(ch);
+            #72: if ch > 1 then dec(ch);
+          end;
+    end;
+  until false;
+end;
+
+procedure KeyConfigMenu;
+var
+  sel: integer;
+begin
+  repeat
+    if keyconfig.UseCustomKeys[1] then men[1] := 'Игрок 1 - Свои'
+    else men[1] := 'Игрок 1 - Стрелки';
+
+    if keyconfig.UseCustomKeys[2] then men[2] := 'Игрок 2 - Свои'
+    else men[2] := 'Игрок 2 - WASD';
+
+    if keyconfig.UseCustomKeys[3] then men[3] := 'Игрок 3 - Свои'
+    else men[3] := 'Игрок 3 - Numpad';
+
+    if keyconfig.UseCustomExtra then men[4] := 'Дополнительные - Свои'
+    else men[4] := 'Дополнительные - Стандарт';
+
+    men[5] := 'Сохранить и выйти';
+
+    sel := menu(5, 1, 'Управление');
+    case sel of
+      1: PlayerKeyMenu(1);
+      2: PlayerKeyMenu(2);
+      3: PlayerKeyMenu(3);
+      4: ExtraKeyMenu;
+      0, 5: break;
+    end;
+  until false;
+  keyconfig.SaveKeyConfig('keys.ini');
+end;
+{ ============ End Key Configuration Menu ============ }
+
 function skillmenu:integer;
 var s:integer;
 begin
@@ -6306,10 +6541,11 @@ begin
    men[3]:='Вместе';
    men[4]:='Бой';
    men[5]:='Загрузить';
-   men[6]:='Редактор';
-   men[7]:='Выход';
+   men[6]:='Управление';
+   men[7]:='Редактор';
+   men[8]:='Выход';
    with level do
-   case menu(7,1,'') of
+   case menu(8,1,'') of
     1: begin // Single player game
          debug:=false;
          loadlevellist('single');
@@ -6379,10 +6615,11 @@ begin
          end else continue;
        end;
     5: begin loadgame(getsave('Load')); if loaded then break; end;
-    6: begin level.cheater:=false;
+    6: KeyConfigMenu;
+    7: begin level.cheater:=false;
         winall:=false; endgame:=false; debug:=true; editor:=true;first:=true;
         repeat sdlinput.PollEvents until not sdlinput.push; end;
-    0,7: begin endgame:=true; first:=true;end;
+    0,8: begin endgame:=true; first:=true;end;
    end;
  until level.first;
 end;
@@ -6504,9 +6741,10 @@ var
   a: real;
 begin
    keyb;
+   { Use keyconfig for player keys }
    for j:=1 to min(3,level.maxpl) do
      for i:=1 to maxkey do
-       player[j].key[i]:=pkey[ckey[j,i]];
+       player[j].key[i]:=pkey[keyconfig.GetPlayerKey(j, i)];
 
    player[1].key[kJump]:=player[1].key[kJump] or pkey[57{Space Bar}];
 
@@ -6520,36 +6758,47 @@ begin
      key[katack]:=push;
      key[knext]:=push2;
    end;
-   if pkey[59 {F1}]then
+
+   { Use keyconfig for extra keys }
+   if pkey[keyconfig.GetExtraKey(KC_FRAGS)]then
      if unpush then begin si:=not si; unpush:=false; end;
 
-   if pkey[60 {F2}]then
+   if pkey[keyconfig.GetExtraKey(KC_SAVE)]then
      savegame(getsave('Save'));
-   if pkey[61 {F3}]then
+   if pkey[keyconfig.GetExtraKey(KC_LOAD)]then
      loadgame(getsave('Load'));
+
    if (not level.death) then begin
-    if pkey[44{Z}] then
+    if pkey[keyconfig.GetExtraKey(KC_BOTFOLLOW)] then
       for i:=2 to level.maxpl do
         player[i].coverme(1);
-    if pkey[45{X}] then
+    if pkey[keyconfig.GetExtraKey(KC_BOTSTAND)] then
       for i:=2 to level.maxpl do
         player[i].takeposition(map.m^[player[1].hero].mx,map.m^[player[1].hero].my);
-    if pkey[46{C}] then
+    if pkey[keyconfig.GetExtraKey(KC_BOTATTACK)] then
       for i:=2 to level.maxpl do
         player[i].freebot;
-    if pkey[47{V}] then
+    if pkey[keyconfig.GetExtraKey(KC_BOTFREEZE)] then
       for i:=2 to level.maxpl do
         player[i].gotoexit;
-     for i:=1 to 9 do {ShortCut Weapon}
-      if pkey[i+1] then
-        map.m^[player[1].hero].fastweap(i);
-     end;
+    {ShortCut Weapon}
+    if pkey[keyconfig.GetExtraKey(KC_WEAP1)] then map.m^[player[1].hero].fastweap(1);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP2)] then map.m^[player[1].hero].fastweap(2);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP3)] then map.m^[player[1].hero].fastweap(3);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP4)] then map.m^[player[1].hero].fastweap(4);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP5)] then map.m^[player[1].hero].fastweap(5);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP6)] then map.m^[player[1].hero].fastweap(6);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP7)] then map.m^[player[1].hero].fastweap(7);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP8)] then map.m^[player[1].hero].fastweap(8);
+    if pkey[keyconfig.GetExtraKey(KC_WEAP9)] then map.m^[player[1].hero].fastweap(9);
+   end;
+
    if not level.death then begin
      a:=0;
-     if pkey[73{PgUp}] then a:=-pi/4;
-     if pkey[81{PgDn}] then a:=pi/4;
-     if pkey[71{Home}] then a:=-3*pi/4;
-     if pkey[79{End}] then a:=3*pi/4;
+     if pkey[keyconfig.GetExtraKey(KC_ANGLEUP)] then a:=-pi/4;
+     if pkey[keyconfig.GetExtraKey(KC_ANGLEDOWN)] then a:=pi/4;
+     if pkey[keyconfig.GetExtraKey(KC_ANGLEHOME)] then a:=-3*pi/4;
+     if pkey[keyconfig.GetExtraKey(KC_ANGLEEND)] then a:=3*pi/4;
      if a<>0 then begin
        if cos(a)>0 then
        map.m^[player[1].hero].dest:=right
@@ -6881,6 +7130,10 @@ var
 begin
   randomize; new(a);
   loaddoomini;
+
+  { Initialize key configuration }
+  keyconfig.InitKeyConfig;
+  keyconfig.LoadKeyConfig('keys.ini');
 
   firstintro; loadkeys;
 
