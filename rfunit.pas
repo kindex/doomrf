@@ -130,7 +130,8 @@ var
     health,armor,h,stay:longint;
     defitem: tmaxweapon; {?}
     fish, turret, barrel, fly, clever:boolean;
-    colormap: byte; { 0=green, 1=indigo, 2=brown, 3=red }
+    colormap: byte; { 0=green, 1=red, 2=orange, 3=brown, 4=tan, 5=indigo, 6=dark }
+    sourcecolormap: byte; { source color range for translation }
     speed,jumpx,jumpy,acsel,brakes,gun,defangle:real;
     vis:string[32];
     hitSound:string[32];
@@ -329,6 +330,7 @@ begin
       if s1='fly' then fly:=boolean(downcase(s2)='true');
       if s1='clever' then clever:=boolean(downcase(s2)='true');
       if s1='colormap' then colormap:=vl(s2);
+      if s1='sourcecolormap' then sourcecolormap:=vl(s2);
       if s1='turvis' then turvis:=loadasbmp(s2);
       if s1='hitsound' then hitSound:=s2;
       if s1='diesound' then dieSound:=s2;
