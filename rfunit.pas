@@ -38,7 +38,9 @@ const
   multiitem:integer=2;
   Freemultiitem:integer=1;
   bot:array[1..maxplays]of integer=(0,1,1,1,1,1,1,1);
-  tip:array[1..maxplays]of integer=(10,9,12,11,8,7,6,5);
+  // 17,9,12,3,1,5,17,9
+  // green(112), red(176), orange(192), brown(64), tan(32), indigo(96), dark(128)
+  tip:array[1..maxplays]of integer=(17,9,21,22,23,24,25,26);
   scrc:array[1..maxplays]of (nonec,up,down,all,ul,ur,dl,dr)=(all,nonec,nonec,nonec,nonec,nonec,nonec,nonec);
 
   {End}
@@ -128,6 +130,7 @@ var
     health,armor,h,stay:longint;
     defitem: tmaxweapon; {?}
     fish, turret, barrel, fly, clever:boolean;
+    colormap: byte; { 0=green, 1=indigo, 2=brown, 3=red }
     speed,jumpx,jumpy,acsel,brakes,gun,defangle:real;
     vis:string[32];
     hitSound:string[32];
@@ -325,6 +328,7 @@ begin
       if s1='turret' then turret:=boolean(downcase(s2)='true');
       if s1='fly' then fly:=boolean(downcase(s2)='true');
       if s1='clever' then clever:=boolean(downcase(s2)='true');
+      if s1='colormap' then colormap:=vl(s2);
       if s1='turvis' then turvis:=loadasbmp(s2);
       if s1='hitsound' then hitSound:=s2;
       if s1='diesound' then dieSound:=s2;

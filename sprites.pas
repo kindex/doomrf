@@ -5,6 +5,16 @@ const
   maxdots=1024*1024*bpp;
   maxpat=2048;
   dotbmp:string[4]='.bmp';
+  { Color translation ranges (Doom palette) }
+  { Order: 112, 176, 192, 64, 32, 96, 128 }
+  GREEN_START = 112;   { 0 - green (original) }
+  GREEN_END = 127;
+  COLOR1_START = 176;  { 1 - red }
+  COLOR2_START = 192;  { 2 - orange }
+  COLOR3_START = 64;   { 3 - brown }
+  COLOR4_START = 32;   { 4 - light tan }
+  COLOR5_START = 96;   { 5 - indigo }
+  COLOR6_START = 128;  { 6 - dark }
 type
   tnpat=0..maxpat;
   filename=string[32];
@@ -84,6 +94,9 @@ type
 
     procedure spritergb(ax,ay:xy; r,g,b: byte);
 
+    procedure spriteTranslated(ax,ay:xy; colormap: byte);
+    procedure spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap: byte);
+
     function loadr(a:string):boolean;
   end;
 const
@@ -96,11 +109,15 @@ var
   noImage,noindex: tnpat; // For errors
   diskload: boolean;
   outc: integer;
+  { Color translation tables: colorTrans[colormap, paletteIndex] -> newIndex }
+  colorTrans: array[0..6, 0..255] of byte;
+  colorTransInit: boolean;
 
 //function loadimage(a:string):image;
 function loadasbmp(a:string):tnpat;
 function loadbmp(a:string):tnpat;
 function loadbmpr(a:string):tnpat;
+procedure InitColorTranslations;
 
 
 implementation
@@ -729,10 +746,85 @@ begin
     end;
 end;
 
+procedure InitColorTranslations;
+var
+  i, j, offset: integer;
+  targetStarts: array[0..6] of integer;
+begin
+  if colorTransInit then exit;
+
+  { Target color ranges for each colormap }
+  { Order: 112, 176, 192, 64, 32, 96, 128 }
+  targetStarts[0] := GREEN_START;   { 0 = green (no change) }
+  targetStarts[1] := COLOR1_START;  { 1 = red (176) }
+  targetStarts[2] := COLOR2_START;  { 2 = orange (192) }
+  targetStarts[3] := COLOR3_START;  { 3 = brown (64) }
+  targetStarts[4] := COLOR4_START;  { 4 = light tan (32) }
+  targetStarts[5] := COLOR5_START;  { 5 = indigo (96) }
+  targetStarts[6] := COLOR6_START;  { 6 = dark (128) }
+
+  { Initialize all colormaps }
+  for j := 0 to 6 do
+  begin
+    { Default: identity mapping (no change) }
+    for i := 0 to 255 do
+      colorTrans[j, i] := i;
+
+    { Remap green range (112-127) to target range }
+    for i := GREEN_START to GREEN_END do
+    begin
+      offset := i - GREEN_START;
+      colorTrans[j, i] := targetStarts[j] + offset;
+    end;
+  end;
+
+  colorTransInit := true;
+end;
+
+procedure tspr.spriteTranslated(ax,ay:xy; colormap: byte);
+var
+  i,j,ss,sx,sy,l,origL: longint;
+  translated: array[0..1024] of byte;
+  srcPtr: ^byte;
+begin
+  if colormap = 0 then begin sprite(ax,ay); exit; end;
+  if not colorTransInit then InitColorTranslations;
+  if tag=ibmp then begin tbmp.put(ax,ay); exit; end;
+
+  ss:=0;
+  for i:=1 to sprlines do begin
+    sx:=spr^[ss+0];
+    sy:=spr^[ss+1];
+    l:=spr^[ss+2];
+    origL:=l;
+
+    { Get pointer to pixel data }
+    srcPtr := @spr^[ss+3];
+
+    { Copy and translate colors }
+    for j:=0 to origL-1 do
+      translated[j] := colorTrans[colormap, srcPtr[j]];
+
+    sdlgraph.sprite(translated,ax+sx,ay+sy,origL);
+    {$ifndef high}
+    l:=l + l mod 2;
+    l:=l div 2;
+    {$endif}
+    inc(ss,l+3);
+  end;
+end;
+
+procedure tspr.spriteTranslatedO(ax,ay:xy; c: color; r,g,b: byte; colormap: byte);
+begin
+  { For now, just use spriteTranslated - can add outline/rgb later if needed }
+  if colormap = 0 then begin spriteo(ax,ay,c,r,g,b); exit; end;
+  spriteTranslated(ax-x div 2, ay-y, colormap);
+end;
 
 begin
   noImage:=0; NoIndex:=0;
   fillchar(p,sizeof(p),0);
   outc:=0;
+  colorTransInit:=false;
   diskload:=false;
 end.
