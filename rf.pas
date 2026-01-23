@@ -4040,7 +4040,7 @@ begin
      begin
        if shift+i=cur then bar(i*ddd,scry+12,(i+1)*ddd-1,getmaxx,white);
        print(i*ddd,scry+2,not white,monster[shift+i].name);
-       p[monster[shift+i].stand[right]].put(i*ddd,scry+12);
+       p[monster[shift+i].stand[right]].spriteTranslated(i*ddd,scry+12,monster[shift+i].colormap);
      end;
    end;
    items:
@@ -4994,17 +4994,17 @@ begin
   if monster[tip].turret then if life then state:=stand else state:=die;
 
   case state of
-   stand:p[monster[tip].stand[dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   run:  p[monster[tip].run[vis,dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   fire: p[monster[tip].fire[dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   hack: p[monster[tip].damage[dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   die:  p[monster[tip].die[vis,dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   crash:p[monster[tip].bomb[vis,dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
-   hai:  p[monster[tip].hai[dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
+   stand:p[monster[tip].stand[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   run:  p[monster[tip].run[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   fire: p[monster[tip].fire[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   hack: p[monster[tip].damage[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   die:  p[monster[tip].die[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   crash:p[monster[tip].bomb[vis,dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
+   hai:  p[monster[tip].hai[dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
    duck:
    p[monster[tip].duck[
    norm(1,monster[tip].ducki.max,(mx div round(monster[tip].ducki.delay+1) mod monster[tip].ducki.max)+1),
-   dest]].spriteo(mx-ax,my-ay,c,r,cg,b);
+   dest]].spriteTranslatedO(mx-ax,my-ay,c,r,cg,b,monster[tip].colormap);
   end;
   if monster[tip].turret {and life }then begin
     // putrot not implemented in SDL2, use static turret sprite
