@@ -183,6 +183,8 @@ type
      prevDest: tdest;
      target: record x,y,mon:integer end;
      who,lastwho: integer{0..maxmon};
+     cwall_x1, cwall_y1, cwall_x2, cwall_y2: integer; { Saved area from fillwall }
+     cwall_cnt: integer; { Debug: +1 fillwall, -1 clearwall }
      angle,co,si: real;
      dest: tdest;
      tip: tmaxmontip;
@@ -330,6 +332,7 @@ type
     procedure done;
     procedure draw;
     procedure drawhidden;
+    procedure checkOrphanCwall;
     procedure drawnodes;
     procedure move;
     procedure clear;
@@ -1784,6 +1787,9 @@ begin
 end;
 procedure tmon.done;
 begin
+  { Force clear cwall before disabling }
+  if cwall_cnt <= 0 then cwall_cnt:=1;
+  clearwall(cwall);
   if level.reswap and ai and first or barrel then
     initmust(1,startx,starty,tip,dest,monswaptime);
   tobj.done;
@@ -2180,6 +2186,10 @@ begin
       fill(map.wlp);
   end;
   map.draw;
+  if debug then begin
+    map.drawhidden;
+    { map.checkOrphanCwall; } { Disabled - cdeath also set by editor for kill zones }
+  end;
   if debug and (bot>0)then
   begin
     map.drawnodes;
@@ -3356,7 +3366,7 @@ begin
   if (health<=0)  then {Kill monster}
   begin
     health:=0;
-    if l then clearwall(cwall + cdeath);
+    if l then clearwall(cwall);
 //    if hero>0 then inc(player[hero].die);
 {    if (dwho>0)and(hero>0) then player[hero].hero:=dwho;}
   end;
@@ -3395,14 +3405,15 @@ end;
 procedure tmon.fillwall(c:byte);
 var
   i,j,sx,sy,x1,y1,x2,y2:integer;
-  ok:boolean;
 begin
   if (state=die)or(state=crash)or barrel then exit;
   sx:=getsx;
   sy:=getsy;
   x1:=lx-sx div 2; x2:=x1+sx-1;
   y2:=ly; y1:=y2-sy+1;
-  if (x1<0)or(y1<0)or(x2>=map.x)or(y2>=map.y) then begin  exit; end;
+  if (x1<0)or(y1<0)or(x2>=map.x)or(y2>=map.y) then exit;
+  cwall_x1:=x1; cwall_y1:=y1; cwall_x2:=x2; cwall_y2:=y2;
+  inc(cwall_cnt);
   for i:=x1 to x2 do
     for j:=y1 to y2 do
      if map.land[j]^[i].land and c=0 then
@@ -3410,14 +3421,12 @@ begin
 end;
 procedure tmon.clearwall(c:byte);
 var
-  i,j,sx,sy,x1,y1,x2,y2:integer;
-  ok:boolean;
+  i,j,x1,y1,x2,y2:integer;
 begin
-  sx:=getsx;
-  sy:=getsy;
-  x1:=lx-sx div 2; x2:=x1+sx-1;
-  y2:=ly; y1:=y2-sy+1;
-  if (x1<0)or(y1<0)or(x2>=map.x)or(y2>=map.y) then begin exit; end;
+  if cwall_cnt <= 0 then exit;
+  dec(cwall_cnt);
+  x1:=cwall_x1; y1:=cwall_y1; x2:=cwall_x2; y2:=cwall_y2;
+  if (x1>x2)or(y1>y2) then exit;
   for i:=x1 to x2 do
     for j:=y1 to y2 do
     if map.land[j]^[i].land and c=c then
@@ -3429,7 +3438,7 @@ var
   ldx, prevDy: real;
   wasStanding: boolean;
 begin
-{  if life then }clearwall(cwall+cdeath);
+  clearwall(cwall);
 
   if not life then
   begin
@@ -3642,7 +3651,7 @@ end;
     end;
   end;
   if (curstate<>crash)and(curstate<>die)then curstate:=stand;
-  if (life)and(state<>die)and(state<>crash) then fillwall(cwall + cdeath);
+  if (life)and(state<>die)and(state<>crash) then fillwall(cwall);
 end;
 
 procedure tmon.moveai;
@@ -5045,6 +5054,8 @@ procedure tmon.init(ax,ay,adx,ady:real; at:tmaxmontip; ad:tdest; aw:longint; aai
 begin
   fillchar(bul,sizeof(bul),0);
   tobj.init(ax,ay,adx,ady,af);
+  cwall_x1:=0; cwall_y1:=0; cwall_x2:=0; cwall_y2:=0;
+  cwall_cnt:=0;
   sniperman:=false;
   target.mon:=-1;
   g:=map.g;
@@ -5639,6 +5650,39 @@ begin
       end;
     end;
 end;
+procedure tmap.checkOrphanCwall;
+var
+  i,j,k,sx,sy,x1,y1,x2,y2,px,py: integer;
+  owned: boolean;
+begin
+  for j:=0 to y-1 do
+    for i:=0 to x-1 do
+      if land[j]^[i].land and cdeath > 0 then
+      begin
+        owned := false;
+        for k:=0 to maxmon do
+          if m^[k].enable and m^[k].life and
+             (m^[k].state <> die) and (m^[k].state <> crash) then
+          begin
+            sx := m^[k].getsx;
+            sy := m^[k].getsy;
+            x1 := m^[k].lx - sx div 2;
+            x2 := x1 + sx - 1;
+            y2 := m^[k].ly;
+            y1 := y2 - sy + 1;
+            if (i >= x1) and (i <= x2) and (j >= y1) and (j <= y2) then
+            begin
+              owned := true;
+              break;
+            end;
+          end;
+        if not owned then begin
+          px := i*8 - dx;
+          py := j*8 - dy;
+          rb.print(px, py, '!');
+        end;
+      end;
+end;
 procedure tmap.drawnodes;
 var i:integer;
 begin
@@ -5747,13 +5791,13 @@ begin
     for i:=0 to maxitem do if item^[i].enable then item^[i].move;
 
     for i:=0 to maxmon do
-      if m^[i].enable then m^[i].fillwall(cwall+cdeath);
+      if m^[i].enable then m^[i].fillwall(cwall);
     for i:=0 to maxmon do
       if m^[i].enable then m^[i].moveai;
     for i:=0 to maxmon do
       if m^[i].enable then m^[i].move;
     for i:=0 to maxmon do
-      if m^[i].enable then m^[i].clearwall(cwall+cdeath);
+      if m^[i].enable then m^[i].clearwall(cwall);
 
     for i:=0 to maxf do if f^[i].enable then f^[i].move;
     for i:=0 to maxpix do if pix^[i].enable then pix^[i].move;
