@@ -3320,8 +3320,8 @@ begin
   if (coxy>0)and(dwho=-1)then dwho:=lastwho;
 
   if (freez.en)and(afreez=0) then begin
-    hit:=hit*10;
-    bomb:=bomb*10;
+    hit:=hit*3;
+    bomb:=bomb*3;
   end;
   if clever then begin
     coxy:=0;
