@@ -4,8 +4,8 @@ program RF; {First verion: 27.2.2001}
 uses sdlinput,wads,sdlgraph,grx,sprites,rfunit,sdltimer,api,sysutils,dos,sdl2,sdl2_mixer,keyconfig;
 const {(C) DiVision: KindeX , Zonik , Dark Sirius }
   game='Doom RF';
-  version='2.1';
-  data='15.01.2026';
+  version='2.2';
+  data='25.01.2026';
   title:string='DOOM RF [513] v' {+version+' ['+data+']'};
   shortintro=game+' ['+version+']';
   menutitle='DOOM 513';

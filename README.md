@@ -1,5 +1,5 @@
 # DOOM RF [513]
-**Release 2.1 [2026.01.20]**
+**Release 2.2 [2026.01.25]**
 DiVision (C) Andrey Ivanov (Pelipenko), kindexz@gmail.com, 2001-2026
 
 GitHub: https://github.com/kindex/doomrf
